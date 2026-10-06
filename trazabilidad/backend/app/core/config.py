@@ -41,7 +41,13 @@ class Settings(BaseSettings):
 
     @field_validator("DATABASE_URL", mode="before")
     def clean_database_url(cls, v: str) -> str:
-        return v.strip() if isinstance(v, str) else v
+        if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("postgres://"):
+                v = "postgresql+psycopg://" + v[len("postgres://"):]
+            elif v.startswith("postgresql://") and not v.startswith("postgresql+"):
+                v = "postgresql+psycopg://" + v[len("postgresql://"):]
+        return v
 
     @field_validator("JWT_SECRET", mode="before")
     def clean_jwt_secret(cls, v: str) -> str:

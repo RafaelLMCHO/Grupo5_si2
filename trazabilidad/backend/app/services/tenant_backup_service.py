@@ -170,6 +170,7 @@ class TenantBackupService:
 
         eventos_unidades_dicts = []
         alertas_dicts = []
+        condiciones_dicts = []
         if ideventos:
             eventos_unidades = db.execute(
                 select(EventoUnidad).where(EventoUnidad.idevento.in_(ideventos))
@@ -181,10 +182,10 @@ class TenantBackupService:
             ).scalars().all()
             alertas_dicts = [model_to_dict(al) for al in alertas]
 
-        condiciones = db.execute(
-            select(CondicionTransporte).where(CondicionTransporte.idtenant == idtenant)
-        ).scalars().all()
-        condiciones_dicts = [model_to_dict(c) for c in condiciones]
+            condiciones = db.execute(
+                select(CondicionTransporte).where(CondicionTransporte.idevento.in_(ideventos))
+            ).scalars().all()
+            condiciones_dicts = [model_to_dict(c) for c in condiciones]
 
         # 12. Bitácora de auditoría asociada al tenant
         bitacora_dicts = []
@@ -277,7 +278,7 @@ class TenantBackupService:
                     return True
                 
                 # Si el bucket no existe, intentar crearlo automáticamente
-                if res.status_code == 404 or "Bucket not found" in res.text:
+                if res.status_code in (400, 404) or "not found" in res.text.lower():
                     create_bucket_url = f"{base_url}/storage/v1/bucket"
                     bucket_payload = {"id": bucket, "name": bucket, "public": False}
                     client.post(create_bucket_url, headers=headers, json=bucket_payload)

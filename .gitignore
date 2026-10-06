@@ -20,6 +20,15 @@ tmp/
 Thumbs.db
 .DS_Store
 *.log
+*.docx
+cu_occurrences.txt
+extracted_*.txt
+sprint2_full_text.txt
+!requirements.txt
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Backups
+backups/
+*.json.gz
