@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from sqlalchemy.orm import aliased
@@ -13,6 +13,7 @@ from app.models.cu013_actores_cadena.actor import ActorCadena
 from app.models.cu014_ubicaciones.location import Ubicacion
 from app.models.cu015_unidades_producto.unit import UnidadProducto
 from app.models.cu016_codigos_qr.qr_code import CodigoQR
+from app.models.cu018_trazabilidad.consulta_trazabilidad import ConsultaTrazabilidad
 from app.models.cu021_eventos_transporte.transport_event import EventoTrazabilidad, EventoUnidad
 from app.views.cu016_codigos_qr.public_trace_views import (
     PublicTraceResponse,
@@ -43,7 +44,29 @@ def _ubicacion_info(ubicacion: Optional[Ubicacion]) -> Optional[TraceUbicacionIn
 class PublicTraceController:
 
     @staticmethod
-    def get_trace(db: Session, uuidpublico: str) -> PublicTraceResponse:
+    def _log_consulta(db: Session, qr: CodigoQR, request: Optional[Request]) -> None:
+        """CU-018: registra el escaneo/consulta publica del QR (best-effort)."""
+        ip = None
+        useragent = None
+        if request is not None:
+            ip = (
+                request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+                or (request.client.host if request.client else None)
+            )
+            useragent = request.headers.get("user-agent")
+        db.add(
+            ConsultaTrazabilidad(
+                idcodigoqr=qr.idcodigoqr,
+                ip=ip,
+                useragent=useragent,
+            )
+        )
+        db.commit()
+
+    @staticmethod
+    def get_trace(
+        db: Session, uuidpublico: str, request: Optional[Request] = None
+    ) -> PublicTraceResponse:
         """Historial publico de trazabilidad de una unidad a partir de su UUID.
 
         Solo responde si la unidad tiene un QR activo: evita sondear UUIDs de
@@ -62,6 +85,12 @@ class PublicTraceController:
             # Mismo mensaje que un UUID inexistente: no revelar la existencia
             # de unidades sin QR activo.
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_NO_ENCONTRADO)
+
+        # CU-018: registrar el escaneo sin bloquear la respuesta al consumidor.
+        try:
+            PublicTraceController._log_consulta(db, qr, request)
+        except Exception:  # pragma: no cover - la consulta pública nunca debe fallar
+            db.rollback()
 
         tenant = db.execute(
             select(Tenant).where(Tenant.idtenant == unit.idtenant)
@@ -137,6 +166,6 @@ class PublicTraceController:
 
 
 @router.get("/{uuidpublico}", response_model=PublicTraceResponse)
-def get_public_trace(uuidpublico: str, db: Session = Depends(get_db)):
+def get_public_trace(uuidpublico: str, request: Request, db: Session = Depends(get_db)):
     """Consulta publica de trazabilidad escaneando el QR de una unidad (sin autenticacion)."""
-    return PublicTraceController.get_trace(db, uuidpublico)
+    return PublicTraceController.get_trace(db, uuidpublico, request)

@@ -18,6 +18,11 @@ import { PurchaseManagementController } from './controllers/pages/purchase-manag
 import { ReceptionManagementController } from './controllers/pages/reception-management.controller';
 import { QrManagementController } from './controllers/pages/qr-management.controller';
 import { TransportManagementController } from './controllers/pages/transport-management.controller';
+import { AlertManagementController } from './controllers/pages/alert-management.controller';
+import { DocumentManagementController } from './controllers/pages/document-management.controller';
+import { CertificateManagementController } from './controllers/pages/certificate-management.controller';
+import { TraceabilityController } from './controllers/pages/traceability.controller';
+import { PublicTraceController } from './controllers/pages/public-trace.controller';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 
@@ -42,5 +47,10 @@ export const routes: Routes = [
   { path: 'receptions', component: ReceptionManagementController, canActivate: [authGuard, roleGuard(['SuperAdministrador', 'AdministradorEmpresa', 'GestorOperaciones'])] },
   { path: 'qr-codes', component: QrManagementController, canActivate: [authGuard, roleGuard(['SuperAdministrador', 'AdministradorEmpresa', 'GestorOperaciones', 'GestorVentasPostventa'])] },
   { path: 'shipments', component: TransportManagementController, canActivate: [authGuard, roleGuard(['SuperAdministrador', 'AdministradorEmpresa', 'GestorOperaciones', 'Auditor'])] },
+  { path: 'alerts', component: AlertManagementController, canActivate: [authGuard, roleGuard(['SuperAdministrador', 'AdministradorEmpresa', 'GestorOperaciones'])] },
+  { path: 'documents', component: DocumentManagementController, canActivate: [authGuard, roleGuard(['SuperAdministrador', 'AdministradorEmpresa', 'GestorVentasPostventa'])] },
+  { path: 'certificates', component: CertificateManagementController, canActivate: [authGuard, roleGuard(['SuperAdministrador', 'AdministradorEmpresa', 'GestorOperaciones', 'Auditor'])] },
+  { path: 'traceability', component: TraceabilityController, canActivate: [authGuard] },
+  { path: 'trace/:uuid', component: PublicTraceController },
   { path: '**', redirectTo: 'login' }
 ];

@@ -5,10 +5,15 @@ import '../controllers/bitacora_controller.dart';
 import '../controllers/qr_controller.dart';
 import '../controllers/transport_controller.dart';
 import '../controllers/purchase_controller.dart';
+import '../controllers/trace_controller.dart';
+import '../controllers/alert_controller.dart';
 import 'login_view.dart';
 import 'notifications_view.dart';
 import 'bitacora_view.dart';
 import 'qr_generator_view.dart';
+import 'qr_scanner_view.dart';
+import 'trace_history_view.dart';
+import 'alerts_view.dart';
 import 'shipment_list_view.dart';
 import 'purchase_list_view.dart';
 import '../controllers/ai_assistant_controller.dart';
@@ -29,6 +34,8 @@ class _DashboardViewState extends State<DashboardView> {
   late final NotificationController _notificationController;
   late final BitacoraController _bitacoraController;
   late final QrController _qrController;
+  late final TraceController _traceController;
+  late final AlertController _alertController;
   late final TransportController _transportController;
   late final PurchaseController _purchaseController;
   late final AiAssistantController _aiController;
@@ -42,6 +49,8 @@ class _DashboardViewState extends State<DashboardView> {
     _notificationController = NotificationController(authController: widget.authController);
     _bitacoraController = BitacoraController();
     _qrController = QrController();
+    _traceController = TraceController();
+    _alertController = AlertController();
     _transportController = TransportController();
     _purchaseController = PurchaseController();
     _purchaseController.loadPurchases();
@@ -217,7 +226,7 @@ class _DashboardViewState extends State<DashboardView> {
             ),
             const SizedBox(height: 12),
 
-            // Tarjeta Destacada: Informes Dinámicos por Voz con IA (CU-022)
+            // Tarjeta Destacada: Informes Dinámicos por Voz con IA (fuera de sprint)
             Card(
               color: const Color(0xFF1E293B),
               elevation: 6,
@@ -278,7 +287,7 @@ class _DashboardViewState extends State<DashboardView> {
                                     color: Color(0xFF0284C7),
                                     borderRadius: BorderRadius.all(Radius.circular(6)),
                                   ),
-                                  child: const Text('CU-022', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                  child: const Text('IA', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                                 ),
                               ],
                             ),
@@ -523,6 +532,213 @@ class _DashboardViewState extends State<DashboardView> {
                         Icons.arrow_forward_ios_rounded,
                         size: 18,
                         color: Color(0xFF10B981),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Tarjeta CU-017: Escanear Código QR (cámara)
+            Card(
+              color: const Color(0xFF1E293B),
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xFF06B6D4), width: 1.2),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => QrScannerView(traceController: _traceController),
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(18.0),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF06B6D4).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.qr_code_scanner_rounded,
+                          size: 30,
+                          color: Color(0xFF22D3EE),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Escanear Código QR (CU-017)',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Lectura del QR con la cámara del dispositivo o ingreso manual del código',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 18,
+                        color: Color(0xFF22D3EE),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Tarjeta CU-022: Consultar Historial y Verificar Autenticidad
+            Card(
+              color: const Color(0xFF1E293B),
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xFF10B981), width: 1.2),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => TraceHistoryView(controller: _traceController),
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(18.0),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.verified_user_rounded,
+                          size: 30,
+                          color: Color(0xFF34D399),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Historial y Autenticidad (CU-022)',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Consulta del historial completo de la unidad y verificación de su autenticidad',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 18,
+                        color: Color(0xFF34D399),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Tarjeta CU-024: Alertas e Incidencias
+            Card(
+              color: const Color(0xFF1E293B),
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xFFEF4444), width: 1.2),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => AlertsView(controller: _alertController),
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(18.0),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.warning_amber_rounded,
+                          size: 30,
+                          color: Color(0xFFF87171),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Alertas e Incidencias (CU-024)',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Visualizar, clasificar y resolver alertas de condiciones anómalas',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 18,
+                        color: Color(0xFFF87171),
                       ),
                     ],
                   ),

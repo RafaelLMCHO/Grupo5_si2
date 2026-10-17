@@ -23,6 +23,11 @@ from app.controllers.cu016_codigos_qr.public_trace_controller import router as t
 from app.controllers.cu019_envios_logisticos.shipment_controller import router as shipment_router
 from app.controllers.cu020_asignacion_unidades_envio.shipment_unit_controller import router as shipment_unit_router
 from app.controllers.cu021_eventos_transporte.transport_event_controller import router as transport_event_router
+from app.controllers.cu033_blockchain.blockchain_controller import router as blockchain_router
+from app.controllers.cu023_reporte_sospecha.suspicion_controller import router as suspicion_router
+from app.controllers.cu024_alertas.alert_controller import router as alert_router
+from app.controllers.cu032_documentos_unidad.document_controller import router as document_router
+from app.controllers.cu034_certificados.certificate_controller import router as certificate_router
 from app.controllers.cu022_ia.ai_report_controller import router as ai_report_router
 from app.controllers.cu001_tenants.backup_controller import router as backup_router
 
@@ -66,6 +71,11 @@ app.include_router(qr_router, prefix="/api/v1")
 app.include_router(trace_router, prefix="/api/v1")
 app.include_router(shipment_router, prefix="/api/v1")
 app.include_router(transport_event_router, prefix="/api/v1")
+app.include_router(blockchain_router, prefix="/api/v1")
+app.include_router(suspicion_router, prefix="/api/v1")
+app.include_router(alert_router, prefix="/api/v1")
+app.include_router(document_router, prefix="/api/v1")
+app.include_router(certificate_router, prefix="/api/v1")
 # CU-020 comparte el prefijo /shipments con CU-019 y CU-021: sus subrutas
 # /{idenvio}/units no colisionan con /{idenvio} ni /{idenvio}/events.
 app.include_router(shipment_unit_router, prefix="/api/v1")

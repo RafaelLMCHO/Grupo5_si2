@@ -96,10 +96,17 @@ class BitacoraController:
         idnotificacion: int,
         current_user: User
     ) -> NotificacionResponse:
+        # Resolver el vínculo UsuarioTenant del solicitante para validar propiedad.
+        stmt_ut = select(UsuarioTenant.idusuariotenant).where(
+            UsuarioTenant.idusuario == current_user.idusuario
+        )
+        idut = db.execute(stmt_ut).scalar()
+
         stmt = select(Notificacion).where(Notificacion.idnotificacion == idnotificacion)
         notif = db.execute(stmt).scalar_one_or_none()
 
-        if not notif:
+        # 404 tanto si no existe como si pertenece a otro usuario: no filtrar datos.
+        if not notif or (idut is not None and notif.idusuariotenant != idut):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Notificación con ID {idnotificacion} no encontrada."

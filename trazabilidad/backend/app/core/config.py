@@ -33,6 +33,19 @@ class Settings(BaseSettings):
     SUPABASE_BACKUP_BUCKET: str = "tenant-backups"
     LOCAL_BACKUP_DIR: str = "backups"
 
+    # ── Blockchain / Ethereum (Sprint 3 - CU-033) ──────────────────────────
+    # Si BLOCKCHAIN_ENABLED=False el sistema opera en modo degradado:
+    # los eventos de trazabilidad se registran en PostgreSQL pero no en la red.
+    BLOCKCHAIN_ENABLED: bool = False
+    ETHEREUM_RPC_URL: Optional[str] = None
+    ETHEREUM_CHAIN_ID: int = 11155111  # Sepolia (Ethereum Testnet)
+    ETHEREUM_NETWORK: str = "sepolia"
+    BLOCKCHAIN_PRIVATE_KEY: Optional[str] = None
+    BLOCKCHAIN_ACCOUNT_ADDRESS: Optional[str] = None
+    SMART_CONTRACT_ADDRESS: Optional[str] = None
+    BLOCKCHAIN_CONFIRMATIONS: int = 1
+    BLOCKCHAIN_TIMEOUT_SECONDS: int = 30
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

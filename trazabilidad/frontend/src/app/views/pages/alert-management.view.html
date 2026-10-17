@@ -1,0 +1,201 @@
+<div class="alerts-wrapper">
+  <header class="alerts-nav">
+    <div class="brand">
+      <span class="logo-icon">🚨</span>
+      <span class="brand-name">Alertas e Incidencias (CU-024)</span>
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+      <a routerLink="/dashboard" class="btn-secondary">Volver al Panel</a>
+      <button class="btn-primary" (click)="openCreateModal()">+ Registrar Incidencia</button>
+    </div>
+  </header>
+
+  <main class="alerts-content">
+    @if (successMessage()) {
+      <div class="alert-success">{{ successMessage() }}</div>
+    }
+    @if (errorMessage()) {
+      <div class="alert-error">{{ errorMessage() }}</div>
+    }
+
+    <!-- Resumen -->
+    @if (summary(); as s) {
+      <div class="summary-grid">
+        <div class="summary-card">
+          <span class="summary-label">Total</span>
+          <span class="summary-value">{{ s.total }}</span>
+        </div>
+        <div class="summary-card pendiente">
+          <span class="summary-label">Pendientes</span>
+          <span class="summary-value">{{ s.pendientes }}</span>
+        </div>
+        <div class="summary-card proceso">
+          <span class="summary-label">En Proceso</span>
+          <span class="summary-value">{{ s.en_proceso }}</span>
+        </div>
+        <div class="summary-card resuelta">
+          <span class="summary-label">Resueltas</span>
+          <span class="summary-value">{{ s.resueltas }}</span>
+        </div>
+        <div class="summary-card critica">
+          <span class="summary-label">Críticas</span>
+          <span class="summary-value">{{ s.criticas }}</span>
+        </div>
+      </div>
+    }
+
+    <div class="filter-bar">
+      <div class="filter-inputs">
+        <select [ngModel]="selectedEstado()" (ngModelChange)="selectedEstado.set($event); onFilter()">
+          @for (e of estados; track e.value) {
+            <option [value]="e.value">{{ e.label }}</option>
+          }
+        </select>
+        <select [ngModel]="selectedTipo()" (ngModelChange)="selectedTipo.set($event); onFilter()">
+          @for (t of tipos; track t.value) {
+            <option [value]="t.value">{{ t.label }}</option>
+          }
+        </select>
+        <select [ngModel]="selectedGravedad()" (ngModelChange)="selectedGravedad.set($event); onFilter()">
+          @for (g of gravedades; track g.value) {
+            <option [value]="g.value">{{ g.label }}</option>
+          }
+        </select>
+        <select [ngModel]="selectedUnidad()" (ngModelChange)="selectedUnidad.set($event ? +$event : null); onFilter()">
+          <option [ngValue]="null">-- Todas las unidades --</option>
+          @for (u of units(); track u.idunidad) {
+            <option [value]="u.idunidad">{{ u.numeroserie }}</option>
+          }
+        </select>
+        <button class="btn-secondary" (click)="onFilter()">Filtrar</button>
+      </div>
+      <div class="total-count">Total: <strong>{{ total() }}</strong> alertas</div>
+    </div>
+
+    <div class="grid-card">
+      @if (isLoading()) {
+        <div style="padding: 2rem; text-align: center; color: #94a3b8;">Cargando alertas...</div>
+      } @else {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Gravedad</th>
+              <th>Estado</th>
+              <th>Unidad</th>
+              <th>Resolutor</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (a of alerts(); track a.idalerta) {
+              <tr>
+                <td><span class="code-id">#{{ a.idalerta }}</span></td>
+                <td>{{ a.fechadeteccion | date: 'short' }}</td>
+                <td>{{ a.tipoalerta }}</td>
+                <td><span class="sev-badge" [ngClass]="gravedadClass(a.gravedad)">{{ a.gravedad }}</span></td>
+                <td><span class="st-badge" [ngClass]="estadoClass(a.estado)">{{ a.estado }}</span></td>
+                <td>{{ a.numeroserie || '—' }}</td>
+                <td>{{ a.usuarioresolutor_nombre || '—' }}</td>
+                <td>
+                  <button class="btn-sm-edit" (click)="openResolveModal(a)">Clasificar / Resolver</button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="8" style="text-align: center; padding: 2rem; color: #64748b;">
+                  No hay alertas registradas con los filtros seleccionados.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  </main>
+
+  <!-- Modal Registrar Incidencia -->
+  @if (isCreateModalOpen()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Registrar Incidencia</h3>
+          <button class="btn-close" (click)="closeCreateModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Tipo de Incidencia *</label>
+            <select [(ngModel)]="createForm.tipoalerta">
+              @for (t of tipos; track t.value) {
+                @if (t.value) {
+                  <option [value]="t.value">{{ t.label }}</option>
+                }
+              }
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group half">
+              <label>Gravedad *</label>
+              <select [(ngModel)]="createForm.gravedad">
+                @for (g of gravedades; track g.value) {
+                  @if (g.value) {
+                    <option [value]="g.value">{{ g.label }}</option>
+                  }
+                }
+              </select>
+            </div>
+            <div class="form-group half">
+              <label>Unidad afectada (opcional)</label>
+              <select [ngModel]="createForm.idunidad" (ngModelChange)="createForm.idunidad = $event ? +$event : undefined">
+                <option [ngValue]="undefined">-- Ninguna --</option>
+                @for (u of units(); track u.idunidad) {
+                  <option [value]="u.idunidad">{{ u.numeroserie }}</option>
+                }
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Descripción *</label>
+            <textarea rows="3" [(ngModel)]="createForm.descripcion" placeholder="Describa la incidencia detectada..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeCreateModal()">Cancelar</button>
+          <button class="btn-primary" [disabled]="isSaving()" (click)="saveAlert()">Registrar</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Modal Clasificar / Resolver -->
+  @if (isResolveModalOpen()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Clasificar / Resolver Alerta #{{ selectedAlert()?.idalerta }}</h3>
+          <button class="btn-close" (click)="closeResolveModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Nuevo Estado *</label>
+            <select [ngModel]="resolveEstado()" (ngModelChange)="resolveEstado.set($event)">
+              <option value="pendiente">Pendiente</option>
+              <option value="en_proceso">En Proceso</option>
+              <option value="resuelta">Resuelta</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Comentario (opcional)</label>
+            <textarea rows="3" [ngModel]="resolveComentario()" (ngModelChange)="resolveComentario.set($event)" placeholder="Nota de clasificación o resolución..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeResolveModal()">Cancelar</button>
+          <button class="btn-primary" [disabled]="isSaving()" (click)="saveResolve()">Guardar</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

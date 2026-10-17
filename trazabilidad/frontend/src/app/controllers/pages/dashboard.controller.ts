@@ -138,6 +138,28 @@ export class DashboardController implements OnInit {
           roles.includes('Auditor')
         );
 
+      case 'alerts':
+        return (
+          roles.includes('AdministradorEmpresa') ||
+          roles.includes('GestorOperaciones')
+        );
+
+      case 'documents':
+        return (
+          roles.includes('AdministradorEmpresa') ||
+          roles.includes('GestorVentasPostventa')
+        );
+
+      case 'certificates':
+        return (
+          roles.includes('AdministradorEmpresa') ||
+          roles.includes('GestorOperaciones') ||
+          roles.includes('Auditor')
+        );
+
+      case 'traceability':
+        return true;
+
       default:
         return false;
     }

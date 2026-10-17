@@ -1,0 +1,203 @@
+<div class="cert-wrapper">
+  <header class="cert-nav">
+    <div class="brand">
+      <span class="logo-icon">🔗</span>
+      <span class="brand-name">Registros Blockchain y Certificados (CU-034)</span>
+    </div>
+    <a routerLink="/dashboard" class="btn-secondary">Volver al Panel</a>
+  </header>
+
+  <main class="cert-content">
+    @if (successMessage()) {
+      <div class="alert-success">{{ successMessage() }}</div>
+    }
+    @if (errorMessage()) {
+      <div class="alert-error">{{ errorMessage() }}</div>
+    }
+
+    <div class="filter-bar">
+      <div class="filter-inputs">
+        <select [ngModel]="selectedUnidad()" (ngModelChange)="selectedUnidad.set($event ? +$event : null)">
+          <option [ngValue]="null">-- Seleccione una unidad --</option>
+          @for (u of units(); track u.idunidad) {
+            <option [value]="u.idunidad">{{ u.numeroserie }}</option>
+          }
+        </select>
+        <button class="btn-primary" (click)="consultar()">Consultar</button>
+      </div>
+      <div class="public-lookup">
+        <input type="text" [ngModel]="uuidLookup()" (ngModelChange)="uuidLookup.set($event)" placeholder="UUID público (consulta pública)" />
+        <button class="btn-secondary" (click)="consultarPublico()">Buscar público</button>
+      </div>
+    </div>
+
+    @if (isLoading()) {
+      <div class="loading">Consultando registros y certificados...</div>
+    }
+
+    @if (certificate(); as c) {
+      <div class="cert-card" id="print-area">
+        <div class="cert-head">
+          <div>
+            <h2>{{ c.producto || 'Producto' }}</h2>
+            <p class="subtitle">
+              S/N: <strong>{{ c.numeroserie }}</strong>
+              @if (c.sku) { · SKU: {{ c.sku }} }
+              @if (c.capacidad) { · {{ c.capacidad }} }
+              @if (c.color) { · {{ c.color }} }
+            </p>
+            <p class="uuid">UUID: {{ c.uuidpublico }}</p>
+          </div>
+          <span class="auth-badge" [ngClass]="autenticidadClass(c.autenticidad)">
+            {{ autenticidadLabel(c.autenticidad) }}
+          </span>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi"><span>Eventos</span><strong>{{ c.total_eventos }}</strong></div>
+          <div class="kpi"><span>Registros Blockchain</span><strong>{{ c.registros_blockchain }}</strong></div>
+          <div class="kpi"><span>Confirmados</span><strong>{{ c.registros_confirmados }}</strong></div>
+          <div class="kpi"><span>Certificaciones</span><strong>{{ c.certificaciones.length }}</strong></div>
+          <div class="kpi"><span>Documentos</span><strong>{{ c.documentos.length }}</strong></div>
+        </div>
+
+        <div class="tabs">
+          <button [class.active]="activeTab() === 'eventos'" (click)="activeTab.set('eventos')">Eventos ({{ c.eventos.length }})</button>
+          <button [class.active]="activeTab() === 'certificaciones'" (click)="activeTab.set('certificaciones')">Certificaciones ({{ c.certificaciones.length }})</button>
+          <button [class.active]="activeTab() === 'documentos'" (click)="activeTab.set('documentos')">Documentos ({{ c.documentos.length }})</button>
+        </div>
+
+        @if (activeTab() === 'eventos') {
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Descripción</th>
+                <th>Blockchain</th>
+                <th>Tx Hash</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (ev of c.eventos; track ev.idevento) {
+                <tr>
+                  <td>{{ ev.fechahora | date: 'short' }}</td>
+                  <td>{{ ev.tipoevento }}</td>
+                  <td>{{ ev.descripcion || '—' }}</td>
+                  <td>
+                    <span class="bb-badge" [ngClass]="ev.verificado ? 'bb-ok' : (ev.en_blockchain ? 'bb-warn' : 'bb-off')">
+                      {{ ev.verificado ? 'Verificado' : (ev.en_blockchain ? 'Anclado' : 'No anclado') }}
+                    </span>
+                  </td>
+                  <td><span class="hash-text">{{ ev.registro_blockchain?.txhash || '—' }}</span></td>
+                </tr>
+              } @empty {
+                <tr><td colspan="5" class="empty">Sin eventos de trazabilidad.</td></tr>
+              }
+            </tbody>
+          </table>
+        }
+
+        @if (activeTab() === 'certificaciones') {
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Certificación</th>
+                <th>Entidad emisora</th>
+                <th>Fecha de obtención</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (cert of c.certificaciones; track cert.idcertificacion) {
+                <tr>
+                  <td>{{ cert.nombre }}</td>
+                  <td>{{ cert.entidademisora || '—' }}</td>
+                  <td>{{ cert.fechaobtencion || '—' }}</td>
+                </tr>
+              } @empty {
+                <tr><td colspan="3" class="empty">Sin certificaciones técnicas asociadas.</td></tr>
+              }
+            </tbody>
+          </table>
+        }
+
+        @if (activeTab() === 'documentos') {
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Tipo</th>
+                <th>Emisión</th>
+                <th>Vencimiento</th>
+                <th>Hash</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (doc of c.documentos; track doc.iddocumento) {
+                <tr>
+                  <td>{{ doc.nombre }}</td>
+                  <td>{{ doc.tipodocumento }}</td>
+                  <td>{{ doc.fechaemision }}</td>
+                  <td>{{ doc.fechavencimiento || '—' }}</td>
+                  <td><span class="hash-text">{{ doc.hasharchivo.substring(0, 12) }}...</span></td>
+                </tr>
+              } @empty {
+                <tr><td colspan="5" class="empty">Sin documentos adjuntos.</td></tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+
+      <div class="cert-actions">
+        <button class="btn-primary" (click)="generarCertificadoDigital()">Generar Certificado Digital</button>
+      </div>
+    }
+
+    @if (digital(); as d) {
+      <div class="digital-card">
+        <h3>Certificado Digital de Trazabilidad</h3>
+        <div class="digital-grid">
+          <div><span>Código</span><strong>{{ d.codigocertificado }}</strong></div>
+          <div><span>Fecha de generación</span><strong>{{ d.fechageneracion | date: 'medium' }}</strong></div>
+          <div><span>Autenticidad</span><strong>{{ d.autenticidad }}</strong></div>
+          <div><span>Eventos verificados</span><strong>{{ d.eventos_verificados }} / {{ d.total_eventos }}</strong></div>
+          <div><span>Documentos</span><strong>{{ d.documentos }}</strong></div>
+          <div><span>Emitido por</span><strong>{{ d.emitido_por || '—' }}</strong></div>
+        </div>
+        <div class="hash-block">
+          <span>Hash SHA-256 del certificado</span>
+          <code>{{ d.hashcertificado }}</code>
+        </div>
+        <p class="digital-msg">{{ d.mensaje }}</p>
+        <div class="cert-actions">
+          <button class="btn-secondary" (click)="imprimir()">Imprimir / Guardar PDF</button>
+        </div>
+      </div>
+    }
+
+    @if (isLoadingPublic()) {
+      <div class="loading">Consultando certificado público...</div>
+    }
+
+    @if (publicCertificate(); as pc) {
+      <div class="cert-card">
+        <div class="cert-head">
+          <div>
+            <h2>Consulta pública</h2>
+            <p class="subtitle">S/N: <strong>{{ pc.numeroserie }}</strong> · {{ pc.producto || 'Producto' }}</p>
+            <p class="uuid">UUID: {{ pc.uuidpublico }}</p>
+          </div>
+          <span class="auth-badge" [ngClass]="autenticidadClass(pc.autenticidad)">
+            {{ autenticidadLabel(pc.autenticidad) }}
+          </span>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi"><span>Eventos</span><strong>{{ pc.total_eventos }}</strong></div>
+          <div class="kpi"><span>Registros Blockchain</span><strong>{{ pc.registros_blockchain }}</strong></div>
+          <div class="kpi"><span>Confirmados</span><strong>{{ pc.registros_confirmados }}</strong></div>
+        </div>
+      </div>
+    }
+  </main>
+</div>

@@ -1,0 +1,181 @@
+<div class="docs-wrapper">
+  <header class="docs-nav">
+    <div class="brand">
+      <span class="logo-icon">📎</span>
+      <span class="brand-name">Documentos Adjuntos a Unidades (CU-032)</span>
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+      <a routerLink="/dashboard" class="btn-secondary">Volver al Panel</a>
+      <button class="btn-primary" (click)="openCreateModal()">+ Adjuntar Documento</button>
+    </div>
+  </header>
+
+  <main class="docs-content">
+    @if (successMessage()) {
+      <div class="alert-success">{{ successMessage() }}</div>
+    }
+    @if (errorMessage()) {
+      <div class="alert-error">{{ errorMessage() }}</div>
+    }
+
+    <div class="filter-bar">
+      <div class="filter-inputs">
+        <select [ngModel]="selectedTipo()" (ngModelChange)="selectedTipo.set($event); onFilter()">
+          @for (t of tipos; track t.value) {
+            <option [value]="t.value">{{ t.label }}</option>
+          }
+        </select>
+        <select [ngModel]="selectedUnidad()" (ngModelChange)="selectedUnidad.set($event ? +$event : null); onFilter()">
+          <option [ngValue]="null">-- Todas las unidades --</option>
+          @for (u of units(); track u.idunidad) {
+            <option [value]="u.idunidad">{{ u.numeroserie }}</option>
+          }
+        </select>
+        <button class="btn-secondary" (click)="onFilter()">Filtrar</button>
+      </div>
+      <div class="total-count">Total: <strong>{{ total() }}</strong> documentos</div>
+    </div>
+
+    <div class="grid-card">
+      @if (isLoading()) {
+        <div style="padding: 2rem; text-align: center; color: #94a3b8;">Cargando documentos...</div>
+      } @else {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Tipo</th>
+              <th>Unidad (Nº Serie)</th>
+              <th>Emisión</th>
+              <th>Vencimiento</th>
+              <th>Hash</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (d of documents(); track d.iddocumento) {
+              <tr>
+                <td><span class="code-id">#{{ d.iddocumento }}</span></td>
+                <td>{{ d.nombre }}</td>
+                <td>{{ tipoLabel(d.tipodocumento) }}</td>
+                <td>{{ d.numeroserie || ('Unidad #' + d.idunidad) }}</td>
+                <td>{{ d.fechaemision }}</td>
+                <td>
+                  @if (d.fechavencimiento) {
+                    <span [class.vencido]="d.vencido">{{ d.fechavencimiento }}</span>
+                  } @else {
+                    —
+                  }
+                </td>
+                <td><span class="hash-text" title="{{ d.hasharchivo }}">{{ d.hasharchivo.substring(0, 12) }}...</span></td>
+                <td>
+                  <button class="btn-sm-edit" (click)="openVerifyModal(d)">Verificar</button>
+                  <button class="btn-sm-delete" (click)="deleteDocument(d)">Eliminar</button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="8" style="text-align: center; padding: 2rem; color: #64748b;">
+                  No hay documentos registrados con los filtros seleccionados.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  </main>
+
+  <!-- Modal Adjuntar Documento -->
+  @if (isCreateModalOpen()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Adjuntar Documento a Unidad</h3>
+          <button class="btn-close" (click)="closeCreateModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Unidad *</label>
+            <select [ngModel]="selectedUnidad()" (ngModelChange)="selectedUnidad.set($event ? +$event : null)">
+              <option [ngValue]="null">-- Seleccione una unidad --</option>
+              @for (u of units(); track u.idunidad) {
+                <option [value]="u.idunidad">{{ u.numeroserie }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group half">
+              <label>Nombre del documento *</label>
+              <input type="text" [(ngModel)]="createForm.nombre" placeholder="Ej. Factura de importación" />
+            </div>
+            <div class="form-group half">
+              <label>Tipo de documento *</label>
+              <select [(ngModel)]="createForm.tipodocumento">
+                @for (t of tipos; track t.value) {
+                  @if (t.value) {
+                    <option [value]="t.value">{{ t.label }}</option>
+                  }
+                }
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>URL del archivo *</label>
+            <input type="text" [(ngModel)]="createForm.urlarchivo" placeholder="https://storage.example.com/documento.pdf" />
+          </div>
+          <div class="form-row">
+            <div class="form-group half">
+              <label>Fecha de emisión</label>
+              <input type="date" [(ngModel)]="createForm.fechaemision" />
+            </div>
+            <div class="form-group half">
+              <label>Fecha de vencimiento</label>
+              <input type="date" [(ngModel)]="createForm.fechavencimiento" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Contenido textual (opcional — calcula el hash SHA-256)</label>
+            <textarea rows="3" [(ngModel)]="createForm.contenido" placeholder="Si pega el contenido se calcula su hash de integridad..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeCreateModal()">Cancelar</button>
+          <button class="btn-primary" [disabled]="isSaving()" (click)="saveDocument()">Adjuntar</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Modal Verificar Integridad -->
+  @if (isVerifyModalOpen()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Verificar Integridad — {{ selectedDocument()?.nombre }}</h3>
+          <button class="btn-close" (click)="closeVerifyModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Hash almacenado</label>
+            <input type="text" [value]="selectedDocument()?.hasharchivo" readonly />
+          </div>
+          <div class="form-group">
+            <label>Hash a comparar</label>
+            <input type="text" [ngModel]="verifyInput()" (ngModelChange)="verifyInput.set($event)" placeholder="Pegue el hash SHA-256 del archivo" />
+          </div>
+          @if (verifyResult(); as r) {
+            <div [ngClass]="r.coincide ? 'verify-ok' : 'verify-fail'">
+              <strong>{{ r.coincide ? '✓ Íntegro' : '✕ Alterado' }}</strong> — {{ r.mensaje }}
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeVerifyModal()">Cerrar</button>
+          <button class="btn-primary" (click)="verifyDocument()">Verificar</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

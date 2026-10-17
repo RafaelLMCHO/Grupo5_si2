@@ -95,6 +95,30 @@
         🚚 Transporte (CU-019/020/021)
       </a>
       }
+      @if (canAccess('traceability')) {
+      <a routerLink="/traceability"
+        style="color: #38bdf8; text-decoration: none; font-weight: 600; font-size: 0.8rem; padding: 0.35rem 0.7rem; background-color: #0c4a6e; border-radius: 6px; border: 1px solid #0284c7;">
+        🔍 Trazabilidad (CU-022)
+      </a>
+      }
+      @if (canAccess('certificates')) {
+      <a routerLink="/certificates"
+        style="color: #a5b4fc; text-decoration: none; font-weight: 600; font-size: 0.8rem; padding: 0.35rem 0.7rem; background-color: #312e81; border-radius: 6px; border: 1px solid #6366f1;">
+        🔗 Certificados (CU-034)
+      </a>
+      }
+      @if (canAccess('documents')) {
+      <a routerLink="/documents"
+        style="color: #6ee7b7; text-decoration: none; font-weight: 600; font-size: 0.8rem; padding: 0.35rem 0.7rem; background-color: #064e3b; border-radius: 6px; border: 1px solid #059669;">
+        📎 Documentos (CU-032)
+      </a>
+      }
+      @if (canAccess('alerts')) {
+      <a routerLink="/alerts"
+        style="color: #fca5a5; text-decoration: none; font-weight: 600; font-size: 0.8rem; padding: 0.35rem 0.7rem; background-color: #7f1d1d; border-radius: 6px; border: 1px solid #dc2626;">
+        🚨 Alertas (CU-024)
+      </a>
+      }
 
       <!-- Selector de empresa (Solo para SuperAdministrador) -->
       @if (canAccess('tenants') && tenants().length > 0) {

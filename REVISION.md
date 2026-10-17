@@ -300,3 +300,159 @@ Notas:
 - Ocurrencias de CUs en el documento: `cu_occurrences.txt`
 - Documento Sprint 2 en texto: `sprint2_full_text.txt`
 - README del proyecto (ejecución local): `README.md`
+
+---
+
+## 8. Plan de implementación — Sprint 3 (Trazabilidad, Blockchain y autenticidad)
+
+Alcance acordado: **9 CU** — los 7 del backlog del Sprint 3
+(CU-017, CU-018, CU-022, CU-023, CU-032, CU-033, CU-034) más **CU-005** y **CU-024**,
+que la tabla general del documento también ubica en el Sprint 3.
+
+### 8.1. Estado actual (qué falta)
+
+Ya existe:
+- `CU-018` (backend): `controllers/cu016_codigos_qr/public_trace_controller.py` →
+  `GET /trace/{uuidpublico}`, registrado en `main.py`. ✅ cierra con registro de
+  consultas (`consultatrazabilidad`) tras la Fase 2.
+- `CU-021` (Sprint 2) y modelos `EventoTrazabilidad` / `EventoUnidad` /
+  `CondicionTransporte` / `Alerta` en `models/cu021_eventos_transporte/transport_event.py`.
+- Tablas ya creadas en la migración `4eaeaf39d7a4` (sprints futuros):
+  `registroblockchain`, `consultatrazabilidad`, `documentounidad`, `alerta`
+  (sin modelo ni controlador que las use).
+- `CU-005`: `controllers/cu005_bitacora` (bitácora + notificaciones) implementado.
+
+Falta por completo:
+- (ninguno) — todos los CU del Sprint 3 quedaron implementados en las Fases 1–5.
+
+> Nota de numeración: la tabla oficial (Sprint 3) define **CU-017 = Escanear Código QR**
+> y **CU-022 = Consultar Historial y Verificar Autenticidad**. El card de IA del móvil
+> estaba mal etiquetado como "CU-022" (los informes por voz son fuera de sprint); se
+> corrigió a "IA". El frontend Angular aún muestra esa etiqueta (pendiente, fuera de Fase 3).
+
+Resuelto en Fase 1–3:
+- Blockchain: `RegistroBlockchain`, servicio Web3, Smart Contract `TraceabilityRegistry`,
+  dependencias `web3`/`py-solc-x`, endpoints CU-033 y registro de consultas CU-018.
+- Móvil: escaneo QR (CU-017) y consulta de historial/autenticidad (CU-022).
+
+Resuelto en Fase 4:
+- CU-023 (reporte público de sospecha → alerta `fraude_autenticidad`).
+- CU-024 (gestión de alertas e incidencias) sobre la tabla `alerta` ya existente.
+- CU-005 (validación de propiedad en notificaciones).
+
+Resuelto en Fase 5:
+- CU-032 (documentos adjuntos a unidades, con hash de integridad) sobre `documentounidad`.
+- CU-034 (consulta consolidada de registros Blockchain + certificaciones + documentos y
+  certificado digital de trazabilidad).
+
+### 8.2. Orden de implementación (por dependencias)
+
+**Fase 1 — Infraestructura Blockchain** — ✅ COMPLETADA
+1. T039 Conexión Ethereum Testnet (config + cliente Web3).
+   - `app/core/config.py`: `BLOCKCHAIN_ENABLED`, `ETHEREUM_RPC_URL`, `ETHEREUM_CHAIN_ID`,
+     `ETHEREUM_NETWORK`, `BLOCKCHAIN_PRIVATE_KEY`, `BLOCKCHAIN_ACCOUNT_ADDRESS`,
+     `SMART_CONTRACT_ADDRESS`, `BLOCKCHAIN_CONFIRMATIONS`; `.env.example` actualizado.
+   - `app/services/blockchain/web3_client.py`: `EthereumClient` (conexión, `is_connected`,
+     chain id, bloque, cuenta firmante, `health`). Import de `web3` perezoso/guardado.
+2. T040 Diseño del Smart Contract de registro de eventos.
+   - `blockchain/contracts/TraceabilityRegistry.sol` (eventos → `eventId` + `payloadHash`,
+     roles registrar/owner, verificación y consulta).
+3. T041 Implementación del Smart Contract.
+   - `blockchain/scripts/compile_contracts.py` (py-solc-x, solc 0.8.26) →
+     `blockchain/build/TraceabilityRegistry.json` (ABI + bytecode). Artefacto generado.
+   - `app/services/blockchain/contract_registry.py`: carga ABI/bytecode, `get_contract()`,
+     `is_deployed()`, `deploy()`.
+   - `requirements.txt`: `web3>=7.0.0,<8.0.0`, `py-solc-x>=2.0.0`.
+   - Verificado: `app.main` importa OK; `ethereum_client.health()` y carga del artefacto
+     (16 entradas ABI, 5252 bytes bytecode) OK con `BLOCKCHAIN_ENABLED=false` (modo degradado).
+
+**Fase 2 — Backend trazabilidad + Web3 (CU-018, CU-033)** — ✅ COMPLETADA
+4. T038 API REST de registro de eventos de trazabilidad (base de CU-018).
+   - `app/views/cu033_blockchain/blockchain_views.py` (request/response schemas).
+   - `app/controllers/cu033_blockchain/blockchain_controller.py`: `POST /blockchain/events`,
+     `POST /blockchain/events/{id}/anchor`, `GET /blockchain/events/{id}`,
+     `GET .../verify`, `GET /blockchain/registry`, `GET /blockchain/status`; router
+     registrado en `app/main.py` bajo `/api/v1`.
+5. T042 Integración FastAPI ↔ Smart Contract vía Web3.
+   - `app/services/blockchain/registry_service.py`: hash canónico SHA-256 del payload,
+     `anchor_event` (firma tx `registerEvent`, espera recibo), `verify_event`,
+     `get_onchain_event`, `list_registros`; **modo degradado**: si la red no está lista
+     deja el registro en `pendiente` sin romper la request.
+6. T044 Modelo `RegistroBlockchain` + persistencia de hash/txhash/blocknumber.
+   - `app/models/cu033_blockchain/registro_blockchain.py` (tabla `registroblockchain`,
+     enum `estado_confirmacion_enum`) + alta en `app/models/__init__.py`.
+7. T043 Asociación evento ↔ actor/ubicación/fecha/transacción.
+   - `TraceabilityEventDetailResponse` resuelve actor origen/destino, ubicación,
+     usuario responsable, unidades y el registro blockchain asociado.
+8. T045 Consulta y validación de registros en cadena → cierra CU-033.
+   - Endpoints `verify`, `registry` y `status`; verificación `coincide`/`verificado`.
+   - CU-018: `app/models/cu018_trazabilidad/consulta_trazabilidad.py` +
+     `app/controllers/cu016_codigos_qr/public_trace_controller.py` ahora registra cada
+     escaneo (ip + user-agent) de forma best-effort.
+   - Tests: `tests/test_blockchain_cu033.py` (11 casos). Verificado 11/11 OK y
+     `tests/test_public_trace.py` (6/6 OK) con `BLOCKCHAIN_ENABLED=false`.
+
+**Fase 3 — Móvil (CU-017, CU-022)** — ✅ COMPLETADA
+9. T046 Escaneo de QR con cámara → CU-017.
+   - `pubspec.yaml`: dependencia `mobile_scanner: ^7.4.2`; `AndroidManifest.xml`: permiso
+     `android.permission.CAMERA`.
+   - `lib/views/qr_scanner_view.dart`: `MobileScanner` con overlay de encuadre, extracción
+     del `uuidpublico` de la URL del QR, y fallback de **ingreso manual** del UUID.
+10. T047 Historial/datos de trazabilidad por QR → CU-022.
+   - `lib/models/trace_history_model.dart`, `lib/controllers/trace_service.dart`
+     (`GET /trace/{uuidpublico}`, **público** sin token) y `lib/controllers/trace_controller.dart`.
+   - `lib/views/trace_history_view.dart`: banner de **verificación de autenticidad**
+     (auténtico / no confirmado), ficha de la unidad y línea de tiempo de eventos.
+   - Móvil: tarjetas nuevas en `dashboard_view.dart` (CU-017 Escanear QR, CU-022 Historial
+     y Autenticidad). Se corrigió el etiquetado del card de IA (ya no dice "CU-022").
+   - Verificado: `flutter analyze` → 0 issues; `flutter build web` → ✔ Built build\web.
+
+**Fase 4 — Autenticidad, alertas y bitácora (CU-023, CU-024, CU-005)** — ✅ COMPLETADA
+11. T048 Verificación de autenticidad y reporte de falsificación → CU-023.
+    - `app/views/cu023_reporte_sospecha/` + `app/controllers/cu023_reporte_sospecha/suspicion_controller.py`:
+      `POST /reports/suspicion` **público** (consumidor / visitante anónimo); resuelve la
+      unidad por `uuidpublico` o `numeroserie` y crea una `Alerta` tipo `fraude_autenticidad`
+      (gravedad `alta`). Notifica a los responsables de la empresa (best-effort).
+    - Móvil: `lib/views/report_suspicion_view.dart` + botón "Reportar sospecha" en
+      `trace_history_view.dart`; `AlertService.reportSuspicion` en `lib/controllers/alert_service.dart`.
+12. CU-024 Alertas e Incidencias: controlador + UI móvil sobre el modelo `Alerta`.
+    - `app/views/cu024_alertas/` + `app/controllers/cu024_alertas/alert_controller.py`:
+      `GET /alerts` (filtros estado/tipo/gravedad/unidad + paginación), `GET /alerts/summary`,
+      `GET /alerts/{id}`, `POST /alerts` (incidencia manual), `PATCH /alerts/{id}/estado`
+      (clasificar/resolver; fija `fecharesolucion` + `idusuarioresolutor`). RBAC
+      (SuperAdministrador / AdministradorEmpresa / GestorOperaciones) y aislamiento por tenant.
+    - Móvil: `lib/models/alert_model.dart`, `lib/controllers/alert_service.dart` +
+      `alert_controller.dart`, `lib/views/alerts_view.dart`; nueva tarjeta en `dashboard_view.dart`.
+13. CU-005 Consultar Bitácora y Notificaciones: gap cerrado.
+    - `mark_notification_read` ahora valida **propiedad** de la notificación (evita IDOR);
+      responde 404 si pertenece a otro usuario. (La bitácora y las vistas móviles ya existían.)
+    - Verificado: `python -m pytest tests/test_alerts_cu024.py tests/test_suspicion_cu023.py
+      tests/test_audit.py` → **18/18 OK**; `flutter analyze` → 0 issues;
+      `flutter build web` → ✔ Built build\web.
+
+**Fase 5 — Documentos y certificados (CU-032, CU-034)** — ✅ COMPLETADA
+14. T049 Carga/asociación de documentos a unidades → CU-032.
+    - Modelo `app/models/cu032_documentos_unidad/documento_unidad.py` sobre la tabla
+      `documentounidad` (enum `tipo_documento_enum`); exportado en `app/models/__init__.py`.
+    - `app/views/cu032_documentos_unidad/` + `app/controllers/cu032_documentos_unidad/document_controller.py`:
+      `POST /documents/units/{idunidad}` (adjunta, 201), `GET /documents/units/{idunidad}`,
+      `GET /documents` (filtros tipo/unidad + paginación), `GET /documents/{id}`,
+      `POST /documents/{id}/verify` (verifica integridad del hash SHA-256) y
+      `DELETE /documents/{id}`. RBAC (SuperAdmin / AdminEmpresa / GestorVentasPostventa)
+      y aislamiento por tenant a través de la unidad.
+15. CU-034 Consultar Registros Blockchain y Certificados (lee Fase 2 + CU-032/CU-007).
+    - `app/views/cu034_certificados/` + `app/controllers/cu034_certificados/certificate_controller.py`:
+      `GET /certificates/units/{idunidad}` (consolidado: eventos + registros Blockchain +
+      certificaciones del producto + documentos), `GET /certificates/units/{idunidad}/digital`
+      (certificado digital con `hashcertificado` SHA-256) y
+      `GET /certificates/public/{uuidpublico}` (lectura pública para el consumidor).
+    - RBAC (SuperAdmin / AdminEmpresa / GestorOperaciones / Auditor) y aislamiento por tenant.
+    - Móvil (lectura): `lib/models/certificate_model.dart`,
+      `lib/controllers/certificate_service.dart`, `lib/views/certificate_view.dart`; botón
+      "Ver certificado y registros Blockchain" en `trace_history_view.dart`;
+      `ApiConfig.certificateByUuid`.
+    - Verificado: `tests/test_documents_cu032.py` + `tests/test_certificates_cu034.py` (16/16);
+      `flutter analyze` → 0 issues; `flutter build web` → ✔ Built build\web.
+
+Racional: blockchain (Fase 1–2) habilita CU-033/034/023; CU-017 antes de CU-022;
+CU-032 antes de CU-034; CU-005 al final por estar casi completo.

@@ -1,0 +1,87 @@
+<div class="public-wrapper">
+  <header class="public-header">
+    <div class="brand">
+      <span class="logo-icon">🛡️</span>
+      <span class="brand-name">Verificación de Autenticidad</span>
+    </div>
+  </header>
+
+  <main class="public-content">
+    @if (isLoading()) {
+      <div class="loading">Verificando autenticidad del producto...</div>
+    }
+
+    @if (notFound() && !isLoading()) {
+      <div class="not-found">
+        <div class="not-found-icon">⚠️</div>
+        <h2>Producto no encontrado</h2>
+        <p>El código QR escaneado no corresponde a una unidad registrada y activa en el sistema.</p>
+      </div>
+    }
+
+    @if (trace(); as t) {
+      <div class="hero" [ngClass]="'hero-' + autenticidad()">
+        <div class="hero-badge">{{ autenticidad() === 'verificado' ? '✓' : (autenticidad() === 'registrado' ? '•' : '?') }}</div>
+        <h1>
+          {{ autenticidad() === 'verificado' ? 'Producto Auténtico' : (autenticidad() === 'registrado' ? 'Producto Registrado' : 'Sin datos de trazabilidad') }}
+        </h1>
+        <p>{{ autenticidad() === 'verificado' ? 'Este producto fue verificado en la cadena de bloques.' : 'Este producto forma parte de la cadena de trazabilidad.' }}</p>
+      </div>
+
+      <div class="info-card">
+        <h2>{{ t.producto?.nombre || 'Producto' }}</h2>
+        <p class="subtitle">
+          S/N: <strong>{{ t.numeroserie }}</strong>
+          @if (t.variante?.sku) { · SKU: {{ t.variante?.sku }} }
+          @if (t.variante?.capacidad) { · {{ t.variante?.capacidad }} }
+          @if (t.variante?.color) { · {{ t.variante?.color }} }
+        </p>
+        <div class="grid">
+          <div class="item"><span>Empresa</span><strong>{{ t.empresa || '—' }}</strong></div>
+          <div class="item"><span>Estado</span><strong>{{ t.estado || '—' }}</strong></div>
+          <div class="item"><span>Custodio actual</span><strong>{{ t.custodio_actual?.nombre || 'N/A' }}</strong></div>
+          <div class="item"><span>Ubicación actual</span><strong>{{ t.ubicacion_actual?.nombre || 'N/A' }}</strong></div>
+        </div>
+      </div>
+
+      <div class="timeline-card">
+        <h3>Historial de trazabilidad ({{ t.eventos.length }})</h3>
+        <div class="timeline">
+          @for (ev of t.eventos; track $index) {
+            <div class="timeline-item">
+              <div class="timeline-dot"></div>
+              <div class="timeline-body">
+                <div class="timeline-header">
+                  <span class="timeline-type">{{ ev.tipoevento }}</span>
+                  <span class="timeline-date">{{ ev.fechahora | date: 'short' }}</span>
+                </div>
+                @if (ev.descripcion) { <p class="timeline-desc">{{ ev.descripcion }}</p> }
+                <div class="timeline-meta">
+                  @if (ev.ubicacion) { <span>📍 {{ ev.ubicacion.nombre }}</span> }
+                  @if (ev.actor_origen) { <span>De: {{ ev.actor_origen.nombre }}</span> }
+                  @if (ev.actor_destino) { <span>A: {{ ev.actor_destino.nombre }}</span> }
+                </div>
+              </div>
+            </div>
+          } @empty {
+            <p class="empty">Sin eventos registrados.</p>
+          }
+        </div>
+      </div>
+
+      @if (certificate(); as c) {
+        <div class="info-card">
+          <h3>Registros Blockchain y certificaciones</h3>
+          <div class="grid">
+            <div class="item"><span>Eventos</span><strong>{{ c.total_eventos }}</strong></div>
+            <div class="item"><span>Registros Blockchain</span><strong>{{ c.registros_blockchain }}</strong></div>
+            <div class="item"><span>Confirmados</span><strong>{{ c.registros_confirmados }}</strong></div>
+            <div class="item"><span>Certificaciones técnicas</span><strong>{{ c.certificaciones.length }}</strong></div>
+          </div>
+        </div>
+      } @else if (isLoadingCert()) {
+        <div class="loading">Cargando certificado...</div>
+      }
+    }
+  </main>
+</div>

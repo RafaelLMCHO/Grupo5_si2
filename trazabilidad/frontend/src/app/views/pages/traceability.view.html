@@ -1,0 +1,101 @@
+<div class="trace-wrapper">
+  <header class="trace-nav">
+    <div class="brand">
+      <span class="logo-icon">🔍</span>
+      <span class="brand-name">Consultar Historial y Verificar Autenticidad (CU-022)</span>
+    </div>
+    <a routerLink="/dashboard" class="btn-secondary">Volver al Panel</a>
+  </header>
+
+  <main class="trace-content">
+    @if (errorMessage()) {
+      <div class="alert-error">{{ errorMessage() }}</div>
+    }
+
+    <div class="search-bar">
+      <input type="text" [ngModel]="uuidInput()" (ngModelChange)="uuidInput.set($event)" (keyup.enter)="consultar()"
+        placeholder="Ingrese el UUID público de la unidad (o escanee el QR)" />
+      <button class="btn-primary" (click)="consultar()">Consultar</button>
+    </div>
+
+    @if (isLoading()) {
+      <div class="loading">Consultando trazabilidad...</div>
+    }
+
+    @if (trace(); as t) {
+      <div class="trace-card">
+        <div class="trace-head">
+          <div>
+            <h2>{{ t.producto?.nombre || 'Producto' }}</h2>
+            <p class="subtitle">
+              S/N: <strong>{{ t.numeroserie }}</strong>
+              @if (t.variante?.sku) { · SKU: {{ t.variante?.sku }} }
+              @if (t.variante?.capacidad) { · {{ t.variante?.capacidad }} }
+              @if (t.variante?.color) { · {{ t.variante?.color }} }
+            </p>
+            <p class="uuid">Empresa: {{ t.empresa || '—' }} · Estado: {{ t.estado || '—' }}</p>
+          </div>
+          <span class="auth-badge" [ngClass]="'auth-' + autenticidad()">
+            {{ autenticidad() === 'verificado' ? 'Auténtico' : (autenticidad() === 'registrado' ? 'Registrado' : 'Sin datos') }}
+          </span>
+        </div>
+
+        <div class="info-grid">
+          <div class="info"><span>Custodio actual</span><strong>{{ t.custodio_actual?.nombre || 'N/A' }}</strong></div>
+          <div class="info"><span>Ubicación actual</span><strong>{{ t.ubicacion_actual?.nombre || 'N/A' }}{{ t.ubicacion_actual?.ciudad ? ' (' + t.ubicacion_actual?.ciudad + ')' : '' }}</strong></div>
+          <div class="info"><span>Fecha de ingreso</span><strong>{{ t.fechaingreso | date: 'short' }}</strong></div>
+          <div class="info"><span>QR generado</span><strong>{{ t.qr_fechageneracion | date: 'short' }}</strong></div>
+        </div>
+
+        <h3 class="timeline-title">Línea de tiempo de eventos ({{ t.eventos.length }})</h3>
+        <div class="timeline">
+          @for (ev of t.eventos; track $index) {
+            <div class="timeline-item">
+              <div class="timeline-dot"></div>
+              <div class="timeline-body">
+                <div class="timeline-header">
+                  <span class="timeline-type">{{ ev.tipoevento }}</span>
+                  <span class="timeline-date">{{ ev.fechahora | date: 'short' }}</span>
+                </div>
+                @if (ev.descripcion) {
+                  <p class="timeline-desc">{{ ev.descripcion }}</p>
+                }
+                <div class="timeline-meta">
+                  @if (ev.ubicacion) { <span>📍 {{ ev.ubicacion.nombre }}</span> }
+                  @if (ev.actor_origen) { <span>De: {{ ev.actor_origen.nombre }}</span> }
+                  @if (ev.actor_destino) { <span>A: {{ ev.actor_destino.nombre }}</span> }
+                </div>
+              </div>
+            </div>
+          } @empty {
+            <p class="empty">La unidad aún no tiene eventos de trazabilidad registrados.</p>
+          }
+        </div>
+
+        <div class="trace-actions">
+          <button class="btn-secondary" (click)="verCertificado()" [disabled]="isLoadingCert()">
+            {{ isLoadingCert() ? 'Cargando...' : 'Ver Certificado Público' }}
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (certificate(); as c) {
+      <div class="trace-card">
+        <div class="trace-head">
+          <div>
+            <h2>Certificado público</h2>
+            <p class="subtitle">S/N: <strong>{{ c.numeroserie }}</strong> · {{ c.producto || 'Producto' }}</p>
+          </div>
+          <span class="auth-badge" [ngClass]="'auth-' + c.autenticidad">{{ c.autenticidad }}</span>
+        </div>
+        <div class="info-grid">
+          <div class="info"><span>Eventos</span><strong>{{ c.total_eventos }}</strong></div>
+          <div class="info"><span>Registros Blockchain</span><strong>{{ c.registros_blockchain }}</strong></div>
+          <div class="info"><span>Confirmados</span><strong>{{ c.registros_confirmados }}</strong></div>
+          <div class="info"><span>Certificaciones</span><strong>{{ c.certificaciones.length }}</strong></div>
+        </div>
+      </div>
+    }
+  </main>
+</div>

@@ -30,6 +30,12 @@ from app.models.cu021_eventos_transporte.transport_event import (
     CondicionTransporte,
     Alerta
 )
+from app.models.cu018_trazabilidad.consulta_trazabilidad import ConsultaTrazabilidad
+from app.models.cu033_blockchain.registro_blockchain import RegistroBlockchain
+from app.models.cu032_documentos_unidad.documento_unidad import (
+    DocumentoUnidad,
+    TIPO_DOCUMENTO_ENUM,
+)
 
 __all__ = [
     "Tenant",
@@ -65,4 +71,8 @@ __all__ = [
     "EventoUnidad",
     "CondicionTransporte",
     "Alerta",
+    "ConsultaTrazabilidad",
+    "RegistroBlockchain",
+    "DocumentoUnidad",
+    "TIPO_DOCUMENTO_ENUM",
 ]

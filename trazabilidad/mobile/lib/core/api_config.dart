@@ -121,6 +121,12 @@ class ApiConfig {
   static String get qrUnits => '$baseUrl/qr/units';
   static String get qrGenerate => '$baseUrl/qr/generate';
   static String get qrBase => '$baseUrl/qr';
+  static String traceByUuid(String uuidpublico) => '$baseUrl/trace/$uuidpublico';
+  static String certificateByUuid(String uuidpublico) => '$baseUrl/certificates/public/$uuidpublico';
+  static String get alerts => '$baseUrl/alerts';
+  static String get alertSummary => '$baseUrl/alerts/summary';
+  static String alertEstado(int idalerta) => '$baseUrl/alerts/$idalerta/estado';
+  static String get reportSuspicion => '$baseUrl/reports/suspicion';
   static String get shipments => '$baseUrl/shipments';
   static String get purchases => '$baseUrl/purchases';
   static String get actors => '$baseUrl/actors';
