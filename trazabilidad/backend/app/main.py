@@ -7,7 +7,7 @@ from app.packages.p1_seguridad.router import router as p1_seguridad_router
 from app.packages.p2_catalogo.router import router as p2_catalogo_router
 from app.packages.p3_actores.router import router as p3_actores_router
 from app.packages.p4_trazabilidad.router import router as p4_trazabilidad_router
-from app.controllers.cu032_documentos_unidad.document_controller import router as document_router
+from app.packages.p5_comercial.router import router as p5_comercial_router
 from app.controllers.cu033_blockchain.blockchain_controller import router as blockchain_router
 from app.controllers.cu034_certificados.certificate_controller import router as certificate_router
 
@@ -36,7 +36,7 @@ app.include_router(p1_seguridad_router, prefix="/api/v1")
 app.include_router(p2_catalogo_router, prefix="/api/v1")
 app.include_router(p3_actores_router, prefix="/api/v1")
 app.include_router(p4_trazabilidad_router, prefix="/api/v1")
-app.include_router(document_router, prefix="/api/v1")
+app.include_router(p5_comercial_router, prefix="/api/v1")
 app.include_router(blockchain_router, prefix="/api/v1")
 app.include_router(certificate_router, prefix="/api/v1")
 
