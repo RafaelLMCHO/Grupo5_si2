@@ -1,13 +1,2 @@
-from app.views.cu033_blockchain.blockchain_views import (
-    RegistroBlockchainResponse,
-    CreateTraceabilityEventRequest,
-    TraceabilityEventDetailResponse,
-    VerifyEventResponse,
-)
-
-__all__ = [
-    "RegistroBlockchainResponse",
-    "CreateTraceabilityEventRequest",
-    "TraceabilityEventDetailResponse",
-    "VerifyEventResponse",
-]
+# Shim de compatibilidad hacia app.packages.p6_blockchain
+from app.packages.p6_blockchain.views.cu033_blockchain import *

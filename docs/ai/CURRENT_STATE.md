@@ -11,12 +11,16 @@
 
 * **Estado de la Suite de Pruebas:** **162 PASSED | 0 FAILED | 0 ERRORS** (100% verde en PostgreSQL `blacktest`).
 * **Base de Datos de Pruebas:** PostgreSQL 18 en base de datos dedicada `blacktest`.
-* **Empaquetado Modular en Curso (ADR-003):**
-  * **Paquete 1 (Seguridad y Multi-Tenant):** Completado. Físico en `app/packages/p1_seguridad/` con router agregador en `main.py`.
-  * **Paquete 2 (Catálogo y Abastecimiento):** Completado. Físico en `app/packages/p2_catalogo/` (CU-006 a CU-012) con router agregador en `main.py`. Shims en rutas legacy.
-  * **Paquete 3 (Actores y Ubicaciones):** Completado. Físico en `app/packages/p3_actores/` (CU-013, CU-014) con router agregador en `main.py`. Shims en rutas legacy.
-  * **Paquete 4 (Inventario y Trazabilidad CORE):** Completado. Físico en `app/packages/p4_trazabilidad/` (CU-015, CU-016, CU-018 a CU-024) con router agregador en `main.py`. Shims en rutas legacy.
-  * **Paquete 5 (Comercialización y Documentos):** Completado. Físico en `app/packages/p5_comercial/` (CU-032) con router agregador en `main.py`. Shims en rutas legacy.
+* **Empaquetado Modular Completado al 100% (ADR-003):**
+  * **Paquete 1 (Seguridad y Multi-Tenant):** Físico en `app/packages/p1_seguridad/` (CU-001 a CU-005) con router en `main.py`.
+  * **Paquete 2 (Catálogo y Abastecimiento):** Físico en `app/packages/p2_catalogo/` (CU-006 a CU-012) con router en `main.py`.
+  * **Paquete 3 (Actores y Ubicaciones):** Físico en `app/packages/p3_actores/` (CU-013, CU-014) con router en `main.py`.
+  * **Paquete 4 (Inventario y Trazabilidad CORE):** Físico en `app/packages/p4_trazabilidad/` (CU-015 a CU-024) con router en `main.py`.
+  * **Paquete 5 (Comercialización y Documentos):** Físico en `app/packages/p5_comercial/` (CU-032) con router en `main.py`.
+  * **Paquete 6 (Blockchain y Notarización):** Físico en `app/packages/p6_blockchain/` (CU-033, CU-034) con router en `main.py`.
+  * **Paquete 7 (Reportes e Inteligencia):** Estructurado en `app/packages/p7_reportes/` con router en `main.py` (preparado para CU-035).
+  * **Shims de Compatibilidad:** 100% activos en rutas históricas para cero impacto en capas externas.
+  * **Consolidación en `main.py`:** Reducido de 26 routers dispersos a exactamente 7 inclusiones canónicas de paquete.
 * **Sprints Completados y Auditados:**
   * **Sprint 0:** Arquitectura, Multi-Tenant, Usuarios, Roles y Permisos (CU-001, CU-002, CU-003).
   * **Sprint 1:** Autenticación JWT, Catálogo de Productos Apple, Categorías, Certificaciones, Actores de Cadena y Ubicaciones (CU-004, CU-006 a CU-009, CU-013, CU-014).
@@ -67,10 +71,8 @@
 2. **Seguridad y RBAC:**
    * Validado en Sprint 2: todo endpoint de mutación (`POST`, `PUT`, `DELETE`) exige `require_roles(...)`.
    * El `Super Administrador` posee bypass total en `resolve_tenant_id` y en `require_roles`.
-3. **Mantenibilidad Arquitectónica (Progreso de Empaquetado por Paquetes):**
-   * **P1 Seguridad:** Empaquetado completo en `app/packages/p1_seguridad/` con router agregador en `main.py`.
-   * **P2 Catálogo y Abastecimiento:** Empaquetado completo en `app/packages/p2_catalogo/` con router agregador en `main.py`.
-   * **P3 Actores y Ubicaciones:** Empaquetado completo en `app/packages/p3_actores/` con router agregador en `main.py`.
-   * **P4 Inventario y Trazabilidad CORE:** Empaquetado completo en `app/packages/p4_trazabilidad/` con router agregador en `main.py`.
-   * **P5 Comercialización y Documentos:** Empaquetado completo en `app/packages/p5_comercial/` con router agregador en `main.py`.
-   * **P6 y P7 (Blockchain, Reportes):** Pendientes de traspaso a sus paquetes homólogos en `app/packages/`. Shims de compatibilidad activos.
+3. **Mantenibilidad Arquitectónica (Empaquetado Modular 100% Completado):**
+   * El backend ha sido completamente modularizado en **7 paquetes canónicos** (`p1_seguridad` a `p7_reportes`) bajo `app/packages/`.
+   * `app/main.py` registra exclusivamente las 7 fachadas de paquete con prefijo `/api/v1`.
+   * Los contratos REST, parámetros, respuestas y rutas de cliente Angular/Flutter se mantienen intactos.
+   * Shims de retrocompatibilidad transparentes para toda importación previa.

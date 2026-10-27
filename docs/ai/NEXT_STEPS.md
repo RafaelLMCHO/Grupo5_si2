@@ -56,16 +56,17 @@ flowchart TD
 
 ## 3. Tareas Técnicas de Refactorización y Soporte
 
-El proceso de empaquetado por módulos funcionales (`ADR-003`) se encuentra en ejecución:
+El proceso de empaquetado modular por dominios (`ADR-003`) ha sido **completado al 100%**:
 
 1. **Empaquetado Modular en `app/packages/`:**
-   * [x] **P1 Seguridad (`app/packages/p1_seguridad/`):** Completado. CU-001 a CU-005 migrados con shims y router agregador integrado. 162/162 tests verdes.
-   * [x] **P2 Catálogo y Abastecimiento (`app/packages/p2_catalogo/`):** Completado. CU-006 a CU-012 migrados con shims y `router.py`. Tests 100% verdes.
-   * [x] **P3 Actores y Ubicaciones (`app/packages/p3_actores/`):** Completado. CU-013 y CU-014 migrados con shims y `router.py`. Tests 100% verdes.
-   * [x] **P4 Inventario y Trazabilidad Core (`app/packages/p4_trazabilidad/`):** Completado. CU-015 a CU-024 migrados con shims y `router.py`. Tests 100% verdes.
-   * [x] **P5 Comercialización (`app/packages/p5_comercial/`):** Completado. CU-032 migrado con shims y `router.py`. Tests 100% verdes.
-   * [ ] **P6 Blockchain (`app/packages/p6_blockchain/`):** CU-033 y CU-034.
-   * [ ] **P7 Reportes (`app/packages/p7_reportes/`).**
+   * [x] **P1 Seguridad (`app/packages/p1_seguridad/`):** CU-001 a CU-005 migrados con shims y router agregador.
+   * [x] **P2 Catálogo y Abastecimiento (`app/packages/p2_catalogo/`):** CU-006 a CU-012 migrados con shims y `router.py`.
+   * [x] **P3 Actores y Ubicaciones (`app/packages/p3_actores/`):** CU-013 y CU-014 migrados con shims y `router.py`.
+   * [x] **P4 Inventario y Trazabilidad Core (`app/packages/p4_trazabilidad/`):** CU-015 a CU-024 migrados con shims y `router.py`.
+   * [x] **P5 Comercialización (`app/packages/p5_comercial/`):** CU-032 migrado con shims y `router.py`.
+   * [x] **P6 Blockchain (`app/packages/p6_blockchain/`):** CU-033 y CU-034 migrados con shims y `router.py`.
+   * [x] **P7 Reportes (`app/packages/p7_reportes/`):** Estructurado con `router.py` para Sprint 4.
+   * [x] **Consolidación en `app/main.py`:** 7 fachadas canónicas registradas bajo `/api/v1`. 162/162 tests verdes.
    * **Validación obligatoria por paquete:** Correr `pytest tests/ -v` asegurando 100% de tests verdes sin alterar URLs `/api/v1/...`.
 
 ---

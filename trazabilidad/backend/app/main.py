@@ -8,8 +8,8 @@ from app.packages.p2_catalogo.router import router as p2_catalogo_router
 from app.packages.p3_actores.router import router as p3_actores_router
 from app.packages.p4_trazabilidad.router import router as p4_trazabilidad_router
 from app.packages.p5_comercial.router import router as p5_comercial_router
-from app.controllers.cu033_blockchain.blockchain_controller import router as blockchain_router
-from app.controllers.cu034_certificados.certificate_controller import router as certificate_router
+from app.packages.p6_blockchain.router import router as p6_blockchain_router
+from app.packages.p7_reportes.router import router as p7_reportes_router
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -37,8 +37,8 @@ app.include_router(p2_catalogo_router, prefix="/api/v1")
 app.include_router(p3_actores_router, prefix="/api/v1")
 app.include_router(p4_trazabilidad_router, prefix="/api/v1")
 app.include_router(p5_comercial_router, prefix="/api/v1")
-app.include_router(blockchain_router, prefix="/api/v1")
-app.include_router(certificate_router, prefix="/api/v1")
+app.include_router(p6_blockchain_router, prefix="/api/v1")
+app.include_router(p7_reportes_router, prefix="/api/v1")
 
 
 import jwt

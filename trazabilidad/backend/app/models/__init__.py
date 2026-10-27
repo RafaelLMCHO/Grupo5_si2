@@ -31,7 +31,7 @@ from app.packages.p4_trazabilidad.models.cu021_eventos_transporte.transport_even
     Alerta
 )
 from app.packages.p4_trazabilidad.models.cu018_trazabilidad.consulta_trazabilidad import ConsultaTrazabilidad
-from app.models.cu033_blockchain.registro_blockchain import RegistroBlockchain
+from app.packages.p6_blockchain.models.cu033_blockchain.registro_blockchain import RegistroBlockchain
 from app.packages.p5_comercial.models.cu032_documentos_unidad.documento_unidad import (
     DocumentoUnidad,
     TIPO_DOCUMENTO_ENUM,

@@ -1,6 +1,2 @@
-from app.models.cu033_blockchain.registro_blockchain import (
-    RegistroBlockchain,
-    ESTADO_CONFIRMACION_ENUM,
-)
-
-__all__ = ["RegistroBlockchain", "ESTADO_CONFIRMACION_ENUM"]
+# Shim de compatibilidad hacia app.packages.p6_blockchain
+from app.packages.p6_blockchain.models.cu033_blockchain import *
