@@ -1,8 +1,8 @@
-from app.controllers.cu004_autenticacion.auth_controller import AuthController, router as auth_router, get_current_user
-from app.controllers.cu001_tenants.tenant_controller import TenantController, router as tenant_router
-from app.controllers.cu002_usuarios.user_controller import UserController, router as user_router
-from app.controllers.cu003_roles_permisos.role_controller import RoleController, router as role_router
-from app.controllers.cu005_bitacora.bitacora_controller import (
+from app.packages.p1_seguridad.controllers.cu004_autenticacion.auth_controller import AuthController, router as auth_router, get_current_user
+from app.packages.p1_seguridad.controllers.cu001_tenants.tenant_controller import TenantController, router as tenant_router
+from app.packages.p1_seguridad.controllers.cu002_usuarios.user_controller import UserController, router as user_router
+from app.packages.p1_seguridad.controllers.cu003_roles_permisos.role_controller import RoleController, router as role_router
+from app.packages.p1_seguridad.controllers.cu005_bitacora.bitacora_controller import (
     BitacoraController,
     router as bitacora_router,
     AuditController,

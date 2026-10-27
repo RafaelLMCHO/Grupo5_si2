@@ -56,20 +56,17 @@ flowchart TD
 
 ## 3. Tareas Técnicas de Refactorización y Soporte
 
-Antes o en paralelo con las tareas de Sprint 3, se debe ejecutar la siguiente optimización de bajo riesgo:
+El proceso de empaquetado por módulos funcionales (`ADR-003`) se encuentra en ejecución:
 
-1. **Fachadas de Enrutamiento de los 7 Paquetes (`ADR-003`):**
-   * Crear los archivos en `trazabilidad/backend/app/routers/`:
-     * `p1_seguridad.py`
-     * `p2_catalogo.py`
-     * `p3_actores.py`
-     * `p4_trazabilidad.py`
-     * `p5_comercial.py`
-     * `p6_blockchain.py`
-     * `p7_reportes.py`
-   * Importar en cada uno los controladores existentes correspondientes a sus Casos de Uso.
-   * Modificar [main.py](file:///c:/Users/PERSONAL/Grupo5_si2/trazabilidad/backend/app/main.py) para que solo incluya los 7 routers con prefijo `/api/v1`.
-   * **Validación obligatoria:** Correr `pytest tests/ -v` y comprobar que sigan pasando los **120 tests al 100%**.
+1. **Empaquetado Modular en `app/packages/`:**
+   * [x] **P1 Seguridad (`app/packages/p1_seguridad/`):** Completado. CU-001 a CU-005 migrados con shims y router agregador integrado. 162/162 tests verdes.
+   * [ ] **P2 Catálogo y Abastecimiento (`app/packages/p2_catalogo/`):** CU-006 a CU-012.
+   * [ ] **P3 Actores y Ubicaciones (`app/packages/p3_actores/`):** CU-013 y CU-014.
+   * [ ] **P4 Inventario y Trazabilidad Core (`app/packages/p4_trazabilidad/`):** CU-015 a CU-024.
+   * [ ] **P5 Comercialización (`app/packages/p5_comercial/`):** CU-032.
+   * [ ] **P6 Blockchain (`app/packages/p6_blockchain/`):** CU-033 y CU-034.
+   * [ ] **P7 Reportes (`app/packages/p7_reportes/`).**
+   * **Validación obligatoria por paquete:** Correr `pytest tests/ -v` asegurando 100% de tests verdes sin alterar URLs `/api/v1/...`.
 
 ---
 

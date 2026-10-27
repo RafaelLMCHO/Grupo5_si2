@@ -9,8 +9,10 @@
 
 ## 1. Resumen Ejecutivo de la Base de Código
 
-* **Estado de la Suite de Pruebas:** **120 PASSED | 0 FAILED | 0 ERRORS** (100% verde).
-* **Base de Datos de Pruebas:** PostgreSQL 15+ en base de datos dedicada `blacktest`.
+* **Estado de la Suite de Pruebas:** **162 PASSED | 0 FAILED | 0 ERRORS** (100% verde en PostgreSQL `blacktest`).
+* **Base de Datos de Pruebas:** PostgreSQL 18 en base de datos dedicada `blacktest`.
+* **Empaquetado Modular en Curso (ADR-003):**
+  * **Paquete 1 (Seguridad y Multi-Tenant):** Completado. Código físico migrado a `app/packages/p1_seguridad/` con subdirectorios `controllers/`, `models/`, `views/` y fachada `router.py`. Shims de compatibilidad activos en `app/controllers/cu001`..`cu005`, `app/models/` y `app/views/`. `app/main.py` consume `p1_seguridad_router`.
 * **Sprints Completados y Auditados:**
   * **Sprint 0:** Arquitectura, Multi-Tenant, Usuarios, Roles y Permisos (CU-001, CU-002, CU-003).
   * **Sprint 1:** Autenticación JWT, Catálogo de Productos Apple, Categorías, Certificaciones, Actores de Cadena y Ubicaciones (CU-004, CU-006 a CU-009, CU-013, CU-014).
@@ -61,6 +63,6 @@
 2. **Seguridad y RBAC:**
    * Validado en Sprint 2: todo endpoint de mutación (`POST`, `PUT`, `DELETE`) exige `require_roles(...)`.
    * El `Super Administrador` posee bypass total en `resolve_tenant_id` y en `require_roles`.
-3. **Mantenibilidad Arquitectónica Pendiente:**
-   * Actualmente `main.py` registra 26 routers individuales directamente.
-   * Se requiere agrupar en 7 fachadas (`app/routers/p1_seguridad.py` a `p7_reportes.py`) para modularizar el backend sin romper rutas ni contratos.
+3. **Mantenibilidad Arquitectónica (Progreso de Empaquetado por Paquetes):**
+   * **P1 Seguridad:** Empaquetado completo en `app/packages/p1_seguridad/` con router agregador unificado en `main.py`.
+   * **P2 Catálogo a P7 Reportes:** Pendientes de traspaso a sus paquetes homólogos en `app/packages/`. Shims de compatibilidad listos para garantizar retrocompatibilidad.

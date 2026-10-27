@@ -3,11 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 from app.core.config import settings
-from app.controllers.cu004_autenticacion.auth_controller import router as auth_router
-from app.controllers.cu001_tenants.tenant_controller import router as tenant_router
-from app.controllers.cu002_usuarios.user_controller import router as user_router
-from app.controllers.cu003_roles_permisos.role_controller import router as role_router
-from app.controllers.cu005_bitacora.bitacora_controller import router as audit_router
+from app.packages.p1_seguridad.router import router as p1_seguridad_router
 from app.controllers.cu009_categorias.category_controller import router as category_router
 from app.controllers.cu006_productos_variantes.product_controller import router as product_router
 from app.controllers.cu007_certificaciones.certification_controller import router as certification_router
@@ -29,7 +25,6 @@ from app.controllers.cu024_alertas.alert_controller import router as alert_route
 from app.controllers.cu032_documentos_unidad.document_controller import router as document_router
 from app.controllers.cu034_certificados.certificate_controller import router as certificate_router
 from app.controllers.cu022_ia.ai_report_controller import router as ai_report_router
-from app.controllers.cu001_tenants.backup_controller import router as backup_router
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -52,11 +47,7 @@ app.add_middleware(
 )
 
 # Inclusión de rutas de los controladores
-app.include_router(auth_router, prefix="/api/v1")
-app.include_router(tenant_router, prefix="/api/v1")
-app.include_router(user_router, prefix="/api/v1")
-app.include_router(role_router, prefix="/api/v1")
-app.include_router(audit_router, prefix="/api/v1")
+app.include_router(p1_seguridad_router, prefix="/api/v1")
 app.include_router(category_router, prefix="/api/v1")
 app.include_router(product_router, prefix="/api/v1")
 app.include_router(certification_router, prefix="/api/v1")
@@ -80,14 +71,13 @@ app.include_router(certificate_router, prefix="/api/v1")
 # /{idenvio}/units no colisionan con /{idenvio} ni /{idenvio}/events.
 app.include_router(shipment_unit_router, prefix="/api/v1")
 app.include_router(ai_report_router, prefix="/api/v1")
-app.include_router(backup_router, prefix="/api/v1")
 
 
 import jwt
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select
-from app.models.cu005_bitacora.bitacora import Bitacora
-from app.models.cu002_usuarios.usuario_tenant import UsuarioTenant
+from app.packages.p1_seguridad.models.cu005_bitacora.bitacora import Bitacora
+from app.packages.p1_seguridad.models.cu002_usuarios.usuario_tenant import UsuarioTenant
 from app.db.session import SessionLocal
 
 # Middleware de auditoría automática: registra peticiones exitosas en la bitácora
