@@ -15,6 +15,7 @@
   * **Paquete 1 (Seguridad y Multi-Tenant):** Completado. Físico en `app/packages/p1_seguridad/` con router agregador en `main.py`.
   * **Paquete 2 (Catálogo y Abastecimiento):** Completado. Físico en `app/packages/p2_catalogo/` (CU-006 a CU-012) con router agregador en `main.py`. Shims en rutas legacy.
   * **Paquete 3 (Actores y Ubicaciones):** Completado. Físico en `app/packages/p3_actores/` (CU-013, CU-014) con router agregador en `main.py`. Shims en rutas legacy.
+  * **Paquete 4 (Inventario y Trazabilidad CORE):** Completado. Físico en `app/packages/p4_trazabilidad/` (CU-015, CU-016, CU-018 a CU-024) con router agregador en `main.py`. Shims en rutas legacy.
 * **Sprints Completados y Auditados:**
   * **Sprint 0:** Arquitectura, Multi-Tenant, Usuarios, Roles y Permisos (CU-001, CU-002, CU-003).
   * **Sprint 1:** Autenticación JWT, Catálogo de Productos Apple, Categorías, Certificaciones, Actores de Cadena y Ubicaciones (CU-004, CU-006 a CU-009, CU-013, CU-014).
@@ -69,4 +70,5 @@
    * **P1 Seguridad:** Empaquetado completo en `app/packages/p1_seguridad/` con router agregador en `main.py`.
    * **P2 Catálogo y Abastecimiento:** Empaquetado completo en `app/packages/p2_catalogo/` con router agregador en `main.py`.
    * **P3 Actores y Ubicaciones:** Empaquetado completo en `app/packages/p3_actores/` con router agregador en `main.py`.
-   * **P4 a P7:** Pendientes de traspaso a sus paquetes homólogos en `app/packages/`. Shims de compatibilidad activos.
+   * **P4 Inventario y Trazabilidad CORE:** Empaquetado completo en `app/packages/p4_trazabilidad/` con router agregador en `main.py`.
+   * **P5 a P7 (Comercial, Blockchain, Reportes):** Pendientes de traspaso a sus paquetes homólogos en `app/packages/`. Shims de compatibilidad activos.

@@ -14,14 +14,14 @@ from app.packages.p2_catalogo.controllers.cu007_certificaciones.certification_co
 from app.packages.p2_catalogo.controllers.cu008_catalogo_empresa.tenant_catalog_controller import TenantCatalogController, router as tenant_catalog_router
 from app.packages.p3_actores.controllers.cu013_actores_cadena.actor_controller import ActorController, router as actor_router
 from app.packages.p3_actores.controllers.cu014_ubicaciones.location_controller import LocationController, router as location_router
-from app.controllers.cu015_unidades_producto.unit_controller import UnitController, router as unit_router
+from app.packages.p4_trazabilidad.controllers.cu015_unidades_producto.unit_controller import UnitController, router as unit_router
 from app.packages.p2_catalogo.controllers.cu010_ordenes_compra.purchase_controller import PurchaseController, router as purchase_router
 from app.packages.p2_catalogo.controllers.cu011_compras.purchase_approval_controller import PurchaseApprovalController, router as purchase_approval_router
 from app.packages.p2_catalogo.controllers.cu012_recepciones.reception_controller import ReceptionController, router as reception_router
-from app.controllers.cu016_codigos_qr.qr_controller import QRController, router as qr_router
-from app.controllers.cu019_envios_logisticos.shipment_controller import ShipmentController, router as shipment_router
-from app.controllers.cu020_asignacion_unidades_envio.shipment_unit_controller import ShipmentUnitController, router as shipment_unit_router
-from app.controllers.cu021_eventos_transporte.transport_event_controller import TransportEventController, router as transport_event_router
+from app.packages.p4_trazabilidad.controllers.cu016_codigos_qr.qr_controller import QRController, router as qr_router
+from app.packages.p4_trazabilidad.controllers.cu019_envios_logisticos.shipment_controller import ShipmentController, router as shipment_router
+from app.packages.p4_trazabilidad.controllers.cu020_asignacion_unidades_envio.shipment_unit_controller import ShipmentUnitController, router as shipment_unit_router
+from app.packages.p4_trazabilidad.controllers.cu021_eventos_transporte.transport_event_controller import TransportEventController, router as transport_event_router
 
 __all__ = [
     "AuthController",

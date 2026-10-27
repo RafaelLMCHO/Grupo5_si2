@@ -1,15 +1,2 @@
-from app.views.cu021_eventos_transporte.transport_views import (
-    CondicionTransporteInput,
-    CondicionTransporteResponse,
-    CreateTransportEventRequest,
-    EventoTrazabilidadResponse,
-    EnvioTimelineResponse
-)
-
-__all__ = [
-    "CondicionTransporteInput",
-    "CondicionTransporteResponse",
-    "CreateTransportEventRequest",
-    "EventoTrazabilidadResponse",
-    "EnvioTimelineResponse"
-]
+# Shim de compatibilidad hacia app.packages.p4_trazabilidad
+from app.packages.p4_trazabilidad.views.cu021_eventos_transporte import *

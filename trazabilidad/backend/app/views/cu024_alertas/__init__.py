@@ -1,15 +1,2 @@
-from app.views.cu024_alertas.alert_views import (
-    AlertaResponse,
-    AlertaListResponse,
-    AlertaSummaryResponse,
-    CreateAlertaRequest,
-    UpdateAlertaEstadoRequest,
-)
-
-__all__ = [
-    "AlertaResponse",
-    "AlertaListResponse",
-    "AlertaSummaryResponse",
-    "CreateAlertaRequest",
-    "UpdateAlertaEstadoRequest",
-]
+# Shim de compatibilidad hacia app.packages.p4_trazabilidad
+from app.packages.p4_trazabilidad.views.cu024_alertas import *

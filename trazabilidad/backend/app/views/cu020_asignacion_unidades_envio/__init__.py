@@ -1,17 +1,2 @@
-from app.views.cu020_asignacion_unidades_envio.shipment_unit_views import (
-    EnvioUnidadCandidateResponse,
-    EnvioUnidadAsignadaResponse,
-    EnvioUnidadesResponse,
-    EnvioUnidadAssignRequest,
-    EnvioUnidadBulkAssignRequest,
-    EnvioUnidadActionResponse
-)
-
-__all__ = [
-    "EnvioUnidadCandidateResponse",
-    "EnvioUnidadAsignadaResponse",
-    "EnvioUnidadesResponse",
-    "EnvioUnidadAssignRequest",
-    "EnvioUnidadBulkAssignRequest",
-    "EnvioUnidadActionResponse"
-]
+# Shim de compatibilidad hacia app.packages.p4_trazabilidad
+from app.packages.p4_trazabilidad.views.cu020_asignacion_unidades_envio import *
