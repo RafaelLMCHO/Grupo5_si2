@@ -60,8 +60,8 @@ El proceso de empaquetado por módulos funcionales (`ADR-003`) se encuentra en e
 
 1. **Empaquetado Modular en `app/packages/`:**
    * [x] **P1 Seguridad (`app/packages/p1_seguridad/`):** Completado. CU-001 a CU-005 migrados con shims y router agregador integrado. 162/162 tests verdes.
-   * [ ] **P2 Catálogo y Abastecimiento (`app/packages/p2_catalogo/`):** CU-006 a CU-012.
-   * [ ] **P3 Actores y Ubicaciones (`app/packages/p3_actores/`):** CU-013 y CU-014.
+   * [x] **P2 Catálogo y Abastecimiento (`app/packages/p2_catalogo/`):** Completado. CU-006 a CU-012 migrados con shims y `router.py`. Tests 100% verdes.
+   * [x] **P3 Actores y Ubicaciones (`app/packages/p3_actores/`):** Completado. CU-013 y CU-014 migrados con shims y `router.py`. Tests 100% verdes.
    * [ ] **P4 Inventario y Trazabilidad Core (`app/packages/p4_trazabilidad/`):** CU-015 a CU-024.
    * [ ] **P5 Comercialización (`app/packages/p5_comercial/`):** CU-032.
    * [ ] **P6 Blockchain (`app/packages/p6_blockchain/`):** CU-033 y CU-034.

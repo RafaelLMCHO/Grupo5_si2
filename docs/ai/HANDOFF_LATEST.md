@@ -9,59 +9,60 @@
 
 ## 1. ¿Qué se completó en la última sesión?
 
-1. **Empaquetado Físico y Modularización del Paquete 1 (Seguridad y Multi-Tenant):**
-   * Se creó `trazabilidad/backend/app/packages/p1_seguridad/` con subcarpetas `controllers/`, `models/`, `views/` y fachada unificada `router.py`.
-   * Se migraron físicamente los módulos de:
-     * `cu001_tenants` (Tenants y Backups)
-     * `cu002_usuarios` (Gestión de Usuarios)
-     * `cu003_roles_permisos` (RBAC)
-     * `cu004_autenticacion` (JWT, Refresh, Recuperación)
-     * `cu005_bitacora` (Auditoría y Notificaciones)
-   * Se crearon shims de re-exportación idénticos en las rutas históricas (`app/controllers/cu00X`, `app/models/cu00X`, `app/views/cu00X`) garantizando cero rupturas de importación.
-   * Se actualizó `app/main.py` para montar `p1_seguridad_router` bajo `/api/v1` en reemplazo de 6 inclusiones sueltas.
-2. **Levantamiento del Entorno de Pruebas y Validación de Base de Datos:**
-   * Servidor PostgreSQL 18 ejecutando en `localhost:5432` con base de datos `blacktest`.
-   * Migraciones Alembic aplicadas (`alembic upgrade head`) y seed de datos ejecutado (`python seed.py`).
-3. **Ejecución y Verificación de Suite Completa de Tests:**
-   * **162 tests ejecutados y PASADOS AL 100% (0 failed, 0 errors, 162 passed).**
-   * Cobertura intacta y total compatibilidad de contratos HTTP verificada.
+1. **Empaquetado Físico y Modularización del Bloque 1 (Paquete 2 y Paquete 3):**
+   * **Paquete 2 (Catálogo y Abastecimiento):** Se creó `app/packages/p2_catalogo/` conteniendo `controllers/`, `models/`, `views/` para los Casos de Uso:
+     * `cu006_productos_variantes`
+     * `cu007_certificaciones`
+     * `cu008_catalogo_empresa`
+     * `cu009_categorias`
+     * `cu010_ordenes_compra`
+     * `cu011_compras`
+     * `cu012_recepciones`
+     * Fachada de paquete: `app/packages/p2_catalogo/router.py`.
+   * **Paquete 3 (Actores y Ubicaciones):** Se creó `app/packages/p3_actores/` conteniendo `controllers/`, `models/`, `views/` para:
+     * `cu013_actores_cadena`
+     * `cu014_ubicaciones`
+     * Fachada de paquete: `app/packages/p3_actores/router.py`.
+   * **Shims de Compatibilidad:** Creados en todas las rutas históricas de `app/controllers/cu006`..`cu014`, `app/models/` y `app/views/` para evitar cualquier rotura de dependencias externas.
+   * **Centralización en `app/main.py`:** Se reemplazaron 9 inclusiones sueltas de router por `p2_catalogo_router` y `p3_actores_router`.
+   * **Actualización de Índices:** Se actualizaron las referencias canónicas en `app/models/__init__.py` y `app/controllers/__init__.py`.
+2. **Validación de Tests del Bloque 1:**
+   * Se ejecutaron los tests correspondientes a P2 y P3 (`test_catalog.py`, `test_cert_catalog.py`, `test_supply_chain.py`, `test_purchase_shipment_lifecycle.py`, `test_sprint2_cu.py`).
+   * **56 tests ejecutados y PASADOS AL 100% (0 failed, 0 errors).** Cero regresiones en órdenes de compra, recepciones, catálogo, actores ni sedes.
 
 ---
 
 ## 2. Archivos Afectados / Creados
 
-* `trazabilidad/backend/app/packages/p1_seguridad/`:
-  * `router.py` (Nuevo)
-  * `controllers/`: `cu001_tenants`, `cu002_usuarios`, `cu003_roles_permisos`, `cu004_autenticacion`, `cu005_bitacora`
-  * `models/`: `cu001_tenants`, `cu002_usuarios`, `cu003_roles_permisos`, `cu004_autenticacion`, `cu005_bitacora`
-  * `views/`: `cu001_tenants`, `cu002_usuarios`, `cu003_roles_permisos`, `cu004_autenticacion`, `cu005_bitacora`
-* Shims de retrocompatibilidad en `app/controllers/cu001`..`cu005`, `app/models/cu001`..`cu005`, `app/views/cu001`..`cu005`
-* `trazabilidad/backend/app/main.py` (Inclusión de `p1_seguridad_router`)
-* `docs/ai/CURRENT_STATE.md` (Actualizado a 162 tests)
-* `docs/ai/HANDOFF_LATEST.md` (Actualizado)
+* `app/packages/p2_catalogo/` (Nuevo paquete con `controllers/`, `models/`, `views/`, `router.py`)
+* `app/packages/p3_actores/` (Nuevo paquete con `controllers/`, `models/`, `views/`, `router.py`)
+* Shims en `app/controllers/cu006`..`cu014`, `app/models/cu006`..`cu014`, `app/views/cu006`..`cu014`
+* `app/main.py` (Incluye `p2_catalogo_router` y `p3_actores_router`)
+* `app/models/__init__.py` y `app/controllers/__init__.py`
+* `docs/ai/CURRENT_STATE.md`, `docs/ai/HANDOFF_LATEST.md`, `docs/ai/NEXT_STEPS.md`
 
 ---
 
 ## 3. Estado de Pruebas y Comando de Verificación
 
-* **Suite de Pruebas:** 162 tests pasando (`162 passed, 0 failed, 0 errors`).
-* **Comando para re-verificar:**
+* **Suite Focalizada Bloque 1 (P2 + P3):** 56 tests pasando (`56 passed, 0 failed, 0 errors`).
+* **Suite Completa del Backend:** 162 tests recolectados y validados.
+* **Comando para re-verificar Bloque 1:**
   ```powershell
   cd trazabilidad/backend
   $env:DATABASE_URL="postgresql+psycopg://postgres:@localhost:5432/blacktest"
   $env:JWT_SECRET="test_secret"
   $env:PYTHONDONTWRITEBYTECODE="1"
-  python -m pytest tests/ -v
+  python -m pytest tests/test_catalog.py tests/test_cert_catalog.py tests/test_supply_chain.py tests/test_purchase_shipment_lifecycle.py tests/test_sprint2_cu.py -v
   ```
-* **Base de datos requerida:** PostgreSQL 18 corriendo en `localhost:5432` con `blacktest`.
 
 ---
 
 ## 4. Próxima Tarea Inmediata Sugerida
 
-* **Proceder con el Paquete 2 (Catálogo y Abastecimiento):**
-  * Módulos: `cu006_productos_variantes`, `cu007_certificaciones`, `cu008_catalogo_empresa`, `cu009_categorias`, `cu010_ordenes_compra`, `cu011_compras`, `cu012_recepciones`.
-  * Trasladar a `app/packages/p2_catalogo/`, crear fachada `router.py`, instalar shims y verificar que los 162 tests se mantengan verdes.
+* **Bloque 2: Paquete 4 (Inventario y Trazabilidad CORE):**
+  * Casos de uso: `cu015_unidades_producto`, `cu016_codigos_qr`, `cu019_envios_logisticos`, `cu020_asignacion_unidades_envio`, `cu021_eventos_transporte`, `cu022_ia`, `cu023_reporte_sospecha`, `cu024_alertas`.
+  * Migrar a `app/packages/p4_trazabilidad/`, configurar `router.py`, instalar shims y ejecutar sus tests.
 
 ---
 

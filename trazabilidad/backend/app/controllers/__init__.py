@@ -8,16 +8,16 @@ from app.packages.p1_seguridad.controllers.cu005_bitacora.bitacora_controller im
     AuditController,
     router as audit_router
 )
-from app.controllers.cu009_categorias.category_controller import CategoryController, router as category_router
-from app.controllers.cu006_productos_variantes.product_controller import ProductController, router as product_router
-from app.controllers.cu007_certificaciones.certification_controller import CertificationController, router as certification_router
-from app.controllers.cu008_catalogo_empresa.tenant_catalog_controller import TenantCatalogController, router as tenant_catalog_router
-from app.controllers.cu013_actores_cadena.actor_controller import ActorController, router as actor_router
-from app.controllers.cu014_ubicaciones.location_controller import LocationController, router as location_router
+from app.packages.p2_catalogo.controllers.cu009_categorias.category_controller import CategoryController, router as category_router
+from app.packages.p2_catalogo.controllers.cu006_productos_variantes.product_controller import ProductController, router as product_router
+from app.packages.p2_catalogo.controllers.cu007_certificaciones.certification_controller import CertificationController, router as certification_router
+from app.packages.p2_catalogo.controllers.cu008_catalogo_empresa.tenant_catalog_controller import TenantCatalogController, router as tenant_catalog_router
+from app.packages.p3_actores.controllers.cu013_actores_cadena.actor_controller import ActorController, router as actor_router
+from app.packages.p3_actores.controllers.cu014_ubicaciones.location_controller import LocationController, router as location_router
 from app.controllers.cu015_unidades_producto.unit_controller import UnitController, router as unit_router
-from app.controllers.cu010_ordenes_compra.purchase_controller import PurchaseController, router as purchase_router
-from app.controllers.cu011_compras.purchase_approval_controller import PurchaseApprovalController, router as purchase_approval_router
-from app.controllers.cu012_recepciones.reception_controller import ReceptionController, router as reception_router
+from app.packages.p2_catalogo.controllers.cu010_ordenes_compra.purchase_controller import PurchaseController, router as purchase_router
+from app.packages.p2_catalogo.controllers.cu011_compras.purchase_approval_controller import PurchaseApprovalController, router as purchase_approval_router
+from app.packages.p2_catalogo.controllers.cu012_recepciones.reception_controller import ReceptionController, router as reception_router
 from app.controllers.cu016_codigos_qr.qr_controller import QRController, router as qr_router
 from app.controllers.cu019_envios_logisticos.shipment_controller import ShipmentController, router as shipment_router
 from app.controllers.cu020_asignacion_unidades_envio.shipment_unit_controller import ShipmentUnitController, router as shipment_unit_router

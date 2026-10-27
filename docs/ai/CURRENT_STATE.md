@@ -12,7 +12,9 @@
 * **Estado de la Suite de Pruebas:** **162 PASSED | 0 FAILED | 0 ERRORS** (100% verde en PostgreSQL `blacktest`).
 * **Base de Datos de Pruebas:** PostgreSQL 18 en base de datos dedicada `blacktest`.
 * **Empaquetado Modular en Curso (ADR-003):**
-  * **Paquete 1 (Seguridad y Multi-Tenant):** Completado. Código físico migrado a `app/packages/p1_seguridad/` con subdirectorios `controllers/`, `models/`, `views/` y fachada `router.py`. Shims de compatibilidad activos en `app/controllers/cu001`..`cu005`, `app/models/` y `app/views/`. `app/main.py` consume `p1_seguridad_router`.
+  * **Paquete 1 (Seguridad y Multi-Tenant):** Completado. Físico en `app/packages/p1_seguridad/` con router agregador en `main.py`.
+  * **Paquete 2 (Catálogo y Abastecimiento):** Completado. Físico en `app/packages/p2_catalogo/` (CU-006 a CU-012) con router agregador en `main.py`. Shims en rutas legacy.
+  * **Paquete 3 (Actores y Ubicaciones):** Completado. Físico en `app/packages/p3_actores/` (CU-013, CU-014) con router agregador en `main.py`. Shims en rutas legacy.
 * **Sprints Completados y Auditados:**
   * **Sprint 0:** Arquitectura, Multi-Tenant, Usuarios, Roles y Permisos (CU-001, CU-002, CU-003).
   * **Sprint 1:** Autenticación JWT, Catálogo de Productos Apple, Categorías, Certificaciones, Actores de Cadena y Ubicaciones (CU-004, CU-006 a CU-009, CU-013, CU-014).
@@ -64,5 +66,7 @@
    * Validado en Sprint 2: todo endpoint de mutación (`POST`, `PUT`, `DELETE`) exige `require_roles(...)`.
    * El `Super Administrador` posee bypass total en `resolve_tenant_id` y en `require_roles`.
 3. **Mantenibilidad Arquitectónica (Progreso de Empaquetado por Paquetes):**
-   * **P1 Seguridad:** Empaquetado completo en `app/packages/p1_seguridad/` con router agregador unificado en `main.py`.
-   * **P2 Catálogo a P7 Reportes:** Pendientes de traspaso a sus paquetes homólogos en `app/packages/`. Shims de compatibilidad listos para garantizar retrocompatibilidad.
+   * **P1 Seguridad:** Empaquetado completo en `app/packages/p1_seguridad/` con router agregador en `main.py`.
+   * **P2 Catálogo y Abastecimiento:** Empaquetado completo en `app/packages/p2_catalogo/` con router agregador en `main.py`.
+   * **P3 Actores y Ubicaciones:** Empaquetado completo en `app/packages/p3_actores/` con router agregador en `main.py`.
+   * **P4 a P7:** Pendientes de traspaso a sus paquetes homólogos en `app/packages/`. Shims de compatibilidad activos.

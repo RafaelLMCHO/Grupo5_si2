@@ -4,16 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.packages.p1_seguridad.router import router as p1_seguridad_router
-from app.controllers.cu009_categorias.category_controller import router as category_router
-from app.controllers.cu006_productos_variantes.product_controller import router as product_router
-from app.controllers.cu007_certificaciones.certification_controller import router as certification_router
-from app.controllers.cu008_catalogo_empresa.tenant_catalog_controller import router as tenant_catalog_router
-from app.controllers.cu013_actores_cadena.actor_controller import router as actor_router
-from app.controllers.cu014_ubicaciones.location_controller import router as location_router
+from app.packages.p2_catalogo.router import router as p2_catalogo_router
+from app.packages.p3_actores.router import router as p3_actores_router
 from app.controllers.cu015_unidades_producto.unit_controller import router as unit_router
-from app.controllers.cu010_ordenes_compra.purchase_controller import router as purchase_router
-from app.controllers.cu011_compras.purchase_approval_controller import router as purchase_approval_router
-from app.controllers.cu012_recepciones.reception_controller import router as reception_router
 from app.controllers.cu016_codigos_qr.qr_controller import router as qr_router
 from app.controllers.cu016_codigos_qr.public_trace_controller import router as trace_router
 from app.controllers.cu019_envios_logisticos.shipment_controller import router as shipment_router
@@ -48,16 +41,9 @@ app.add_middleware(
 
 # Inclusión de rutas de los controladores
 app.include_router(p1_seguridad_router, prefix="/api/v1")
-app.include_router(category_router, prefix="/api/v1")
-app.include_router(product_router, prefix="/api/v1")
-app.include_router(certification_router, prefix="/api/v1")
-app.include_router(tenant_catalog_router, prefix="/api/v1")
-app.include_router(actor_router, prefix="/api/v1")
-app.include_router(location_router, prefix="/api/v1")
+app.include_router(p2_catalogo_router, prefix="/api/v1")
+app.include_router(p3_actores_router, prefix="/api/v1")
 app.include_router(unit_router, prefix="/api/v1")
-app.include_router(purchase_router, prefix="/api/v1")
-app.include_router(purchase_approval_router, prefix="/api/v1")
-app.include_router(reception_router, prefix="/api/v1")
 app.include_router(qr_router, prefix="/api/v1")
 app.include_router(trace_router, prefix="/api/v1")
 app.include_router(shipment_router, prefix="/api/v1")

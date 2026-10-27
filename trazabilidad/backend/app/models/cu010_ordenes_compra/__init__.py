@@ -1,3 +1,2 @@
-from app.models.cu010_ordenes_compra.purchase import Compra, CompraDetalle, ESTADO_COMPRA_ENUM
-
-__all__ = ["Compra", "CompraDetalle", "ESTADO_COMPRA_ENUM"]
+# Shim de compatibilidad hacia app.packages.p2_catalogo
+from app.packages.p2_catalogo.models.cu010_ordenes_compra import *

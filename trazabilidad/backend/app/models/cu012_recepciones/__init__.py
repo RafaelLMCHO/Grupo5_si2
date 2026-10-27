@@ -1,9 +1,2 @@
-from app.models.cu012_recepciones.reception import (
-    RecepcionCompra,
-    RecepcionDetalle
-)
-
-__all__ = [
-    "RecepcionCompra",
-    "RecepcionDetalle"
-]
+# Shim de compatibilidad hacia app.packages.p2_catalogo
+from app.packages.p2_catalogo.models.cu012_recepciones import *

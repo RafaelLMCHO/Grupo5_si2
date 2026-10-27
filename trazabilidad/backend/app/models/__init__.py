@@ -5,13 +5,13 @@ from app.packages.p1_seguridad.models.cu002_usuarios.user import User
 from app.packages.p1_seguridad.models.cu002_usuarios.usuario_tenant import UsuarioTenant
 from app.packages.p1_seguridad.models.cu004_autenticacion.password_reset_token import PasswordResetToken
 from app.packages.p1_seguridad.models.cu004_autenticacion.refresh_token import RefreshToken
-from app.models.cu009_categorias.category import Categoria
-from app.models.cu006_productos_variantes.product import Producto
-from app.models.cu006_productos_variantes.variant import VarianteProducto
-from app.models.cu007_certificaciones.certification import Certificacion, ProductoCertificacion
-from app.models.cu008_catalogo_empresa.tenant_catalog import CatalogoTenant
-from app.models.cu013_actores_cadena.actor import ActorCadena
-from app.models.cu014_ubicaciones.location import Ubicacion
+from app.packages.p2_catalogo.models.cu009_categorias.category import Categoria
+from app.packages.p2_catalogo.models.cu006_productos_variantes.product import Producto
+from app.packages.p2_catalogo.models.cu006_productos_variantes.variant import VarianteProducto
+from app.packages.p2_catalogo.models.cu007_certificaciones.certification import Certificacion, ProductoCertificacion
+from app.packages.p2_catalogo.models.cu008_catalogo_empresa.tenant_catalog import CatalogoTenant
+from app.packages.p3_actores.models.cu013_actores_cadena.actor import ActorCadena
+from app.packages.p3_actores.models.cu014_ubicaciones.location import Ubicacion
 from app.models.cu015_unidades_producto.unit import UnidadProducto
 from app.packages.p1_seguridad.models.cu003_roles_permisos.role import Role
 from app.packages.p1_seguridad.models.cu003_roles_permisos.permission import Permiso
@@ -19,8 +19,8 @@ from app.packages.p1_seguridad.models.cu003_roles_permisos.role_permission impor
 from app.packages.p1_seguridad.models.cu003_roles_permisos.usuario_tenant_rol import UsuarioTenantRol
 from app.packages.p1_seguridad.models.cu005_bitacora.bitacora import Bitacora
 from app.packages.p1_seguridad.models.cu005_bitacora.notification import Notificacion
-from app.models.cu010_ordenes_compra.purchase import Compra, CompraDetalle
-from app.models.cu012_recepciones.reception import RecepcionCompra, RecepcionDetalle
+from app.packages.p2_catalogo.models.cu010_ordenes_compra.purchase import Compra, CompraDetalle
+from app.packages.p2_catalogo.models.cu012_recepciones.reception import RecepcionCompra, RecepcionDetalle
 from app.models.cu016_codigos_qr.qr_code import CodigoQR
 from app.models.cu019_envios_logisticos.shipment import Envio
 from app.models.cu020_asignacion_unidades_envio.shipment_unit import EnvioUnidad
