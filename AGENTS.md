@@ -3,7 +3,7 @@
 > **Documento:** Protocolo Canónico y Contrato de Trabajo para Agentes Autónomos  
 > **Ubicación:** `/AGENTS.md` (Raíz del Repositorio)  
 > **Metodología:** SCRUM (Sprint 0 al Sprint 4) · **Sprint Activo:** **Sprint 3 (Trazabilidad, Blockchain y Autenticidad)**  
-> **Estado Técnico:** Sprints 0, 1 y 2 Completados · **120 tests unitarios y de integración verdes** en PostgreSQL (`blacktest`)  
+> **Estado Técnico:** Sprints 0, 1 y 2 Completados; P6 (Blockchain) Integrado · **162 tests unitarios y de integración verdes** en PostgreSQL (`blacktest`)  
 > **Audiencia:** Agentes de Inteligencia Artificial (Antigravity, Cursor, Claude Code, Copilot) y Desarrolladores del Equipo  
 
 ---
@@ -73,12 +73,12 @@ Grupo5_si2/
 
 ### A. Backend (`trazabilidad/backend/`)
 * **Framework:** FastAPI con Python 3.11+, SQLAlchemy 2.0 y esquemas Pydantic v2.
-* **Organización en 7 Paquetes (ADR-003):** P1 Seguridad, P2 Catálogo/Abastecimiento, P3 Actores/Ubicaciones, P4 Inventario/Trazabilidad Core, P5 Comercialización, P6 Blockchain/Certificados, P7 Reportes.
+* **Organización en 7 Paquetes con MVC por CU (ADR-003):** Código empaquetado físicamente en `app/packages/` (P1 Seguridad, P2 Catálogo/Abastecimiento, P3 Actores/Ubicaciones, P4 Inventario/Trazabilidad Core, P5 Comercialización, P6 Blockchain/Certificados, P7 Reportes). Dentro de cada paquete se estructura la tríada MVC por Caso de Uso (`controllers/cuXXX_...`, `models/cuXXX_...`, `views/cuXXX_...`) y una fachada `router.py`. El archivo `main.py` monta exclusivamente estos 7 routers canónicos.
 * **Inmutabilidad de Contratos REST:** NUNCA alteres prefijos existentes bajo `/api/v1/...` (ej. `/api/v1/auth`, `/api/v1/units`, `/api/v1/shipments`, `/api/v1/trace/{uuid}`). Los clientes Angular y Flutter dependen de estas rutas.
 * **Aislamiento Multi-Tenant (ADR-001):** Todo endpoint de lectura o mutación DEBE inyectar `tenant_id: int = Depends(resolve_tenant_id)` y aplicarlo como filtro en las consultas SQL (`WHERE idtenant = :tenant_id`), respetando el bypass explícito del `Super Administrador` (ADR-005).
 * **Gobernanza RBAC:** Decorar endpoints sensibles con `dependencies=[Depends(require_roles([Rol.ADMIN_EMPRESA, ...]))]`.
 * **Transaccionalidad:** Usar inyección `Depends(get_db)` con commit/rollback explícito ante errores.
-* **Suite de Pruebas:** Los **120 tests existentes deben mantenerse al 100% en verde**. Toda nueva funcionalidad debe acompañarse de su test en `tests/` ejecutado contra la base de datos `blacktest`:
+* **Suite de Pruebas:** Los **162 tests existentes deben mantenerse al 100% en verde**. Toda nueva funcionalidad debe acompañarse de su test en `tests/` ejecutado contra la base de datos `blacktest`:
   ```bash
   cd trazabilidad/backend
   pytest tests/ -v
@@ -124,7 +124,7 @@ flowchart TD
 * Revisa en [`docs/IMPLEMENTATION_PHASES.md`](file:///c:/Users/PERSONAL/Grupo5_si2/docs/IMPLEMENTATION_PHASES.md) las tareas asociadas (T001–T061) y las horas/alcance estimados.
 
 ### Paso 2: Arqueología e Inspección de Código Preexistente
-* **Backend:** Revisa si ya existe un controlador en `app/controllers/cuXXX_...`, su modelo en `app/models/` y sus esquemas en `app/views/`. **NUNCA dupliques modelos ni tablas existentes.**
+* **Backend:** Revisa el paquete canónico en `app/packages/pX_.../` (y los shims en `app/controllers/`, `app/models/`, `app/views/`). Comprueba si ya existe el controlador, su modelo y sus esquemas para el CU. **NUNCA dupliques modelos ni tablas existentes.**
 * **Frontend:** Verifica si ya existe el par controlador/vista en `src/app/controllers/pages/` y `src/app/views/pages/`.
 * **Mobile:** Revisa las pantallas y servicios existentes en la app Flutter.
 * Comprueba si el CU se conecta con un servicio compartido (*seam*) en `app/services/` (ej. creación de unidades desde recepción).
@@ -142,7 +142,7 @@ flowchart TD
 ### Paso 5: Plan de Implementación y Estrategia de Pruebas
 * Formula mentalmente el cambio mínimo necesario con alta cohesión y bajo acoplamiento.
 * Diseña de antemano el caso de prueba para `tests/`: escenario exitoso (200/201), validación de error por permisos (403) y aislamiento multi-tenant (un tenant no puede ver datos de otro).
-* Comprueba que la suite actual de 120 tests esté pasando antes de empezar.
+* Comprueba que la suite actual de 162 tests esté pasando antes de empezar.
 
 ---
 
@@ -152,7 +152,7 @@ Una tarea o CU solo se considera terminado cuando:
 1. **Código Completo:** Backend, Frontend y/o Mobile implementados conforme a la arquitectura especificada.
 2. **Aislamiento Verificado:** Filtro `tenant_id` aplicado rigurosamente.
 3. **Auditoría Registrada:** Operaciones sensibles pasando por el middleware de `Bitacora` (`CU-005`).
-4. **Pruebas 100% Verdes:** Suite ejecutada con éxito (`≥120 passed, 0 failed, 0 errors`).
+4. **Pruebas 100% Verdes:** Suite ejecutada con éxito (`≥162 passed, 0 failed, 0 errors`).
 5. **Documentación Viva Actualizada:**
    * Resumen de cambios en [`docs/ai/HANDOFF_LATEST.md`](file:///c:/Users/PERSONAL/Grupo5_si2/docs/ai/HANDOFF_LATEST.md).
    * Estado de componentes en [`docs/ai/CURRENT_STATE.md`](file:///c:/Users/PERSONAL/Grupo5_si2/docs/ai/CURRENT_STATE.md).

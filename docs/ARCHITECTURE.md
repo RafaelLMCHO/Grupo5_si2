@@ -139,36 +139,74 @@ flowchart TD
 
 ---
 
-## 5. Organización del Backend y Estrategia de Enrutamiento
+## 5. Organización del Backend: Modularización por Paquetes y Patrón MVC por Caso de Uso
 
-Actualmente, el backend en `trazabilidad/backend/app/` implementa una división MVC estructurada por casos de uso (`controllers/cuXXX_...`, `models/cuXXX_...`, `views/cuXXX_...`).
-
-Para transicionar hacia la modularización por los 7 paquetes sin romper código ni rutas, se aplica el principio de **Módulos Profundos y Fachadas de Enrutamiento**:
+El backend (`trazabilidad/backend/app/`) implementa una arquitectura híbrida de **Módulos Profundos (Bounded Contexts) y MVC Desacoplado**: el sistema se organiza físicamente en los **7 paquetes de dominio** canónicos bajo `app/packages/` (en cumplimiento del [ADR-003](file:///c:/Users/PERSONAL/Grupo5_si2/docs/DECISION_LOG.md)), y al interior de cada paquete se estructura la lógica siguiendo el patrón **MVC por Caso de Uso (CU)**:
 
 ```
 trazabilidad/backend/app/
-├── core/                   # Configuraciones globales, seguridad JWT, settings
-├── db/                     # Conexión SQLAlchemy, Base declarativa, sesiones
-├── routers/                # FACHADAS DE ENRUTAMIENTO POR LOS 7 PAQUETES (P1 a P7)
-│   ├── p1_seguridad.py     # Agrupa cu001, cu002, cu003, cu004, cu005
-│   ├── p2_catalogo.py      # Agrupa cu006, cu007, cu008, cu009, cu010, cu011, cu012
-│   ├── p3_actores.py       # Agrupa cu013, cu014
-│   ├── p4_trazabilidad.py  # Agrupa cu015 al cu024
-│   ├── p5_comercial.py     # Agrupa cu025 al cu032
-│   ├── p6_blockchain.py    # Agrupa cu033, cu034
-│   └── p7_reportes.py      # Agrupa cu035
-├── controllers/            # Controladores de Casos de Uso existentes
-├── models/                 # Modelos ORM SQLAlchemy existentes
-├── views/                  # Esquemas Pydantic existentes
-├── services/               # Contratos e Interfaces entre Dominios (Seams)
-└── main.py                 # Punto de entrada limpio: registra solo los 7 routers de paquete
+├── core/                               # Configuraciones globales, seguridad JWT, settings
+├── db/                                 # Conexión SQLAlchemy, Base declarativa, sesiones
+├── services/                           # Contratos e Interfaces entre Dominios (Seams)
+├── packages/                           # 7 PAQUETES CANÓNICOS DE DOMINIO
+│   ├── p1_seguridad/                   # Paquete 1: Seguridad y Multi-Tenant (CU-001 al CU-005)
+│   │   ├── controllers/                # Controladores FastAPI por CU (cu001, cu002, cu003, ...)
+│   │   ├── models/                     # Modelos ORM SQLAlchemy 2.0 por CU
+│   │   ├── views/                      # Esquemas Pydantic v2 (DTOs Request/Response) por CU
+│   │   └── router.py                   # Fachada que agrupa y expone los sub-routers de P1
+│   ├── p2_catalogo/                    # Paquete 2: Catálogo y Abastecimiento (CU-006 al CU-012)
+│   │   ├── controllers/                # cu006_productos, cu007_certificaciones, cu010_compras, ...
+│   │   ├── models/
+│   │   ├── views/
+│   │   └── router.py                   # Fachada que agrupa y expone los sub-routers de P2
+│   ├── p3_actores/                     # Paquete 3: Actores y Ubicaciones (CU-013, CU-014)
+│   │   ├── controllers/                # cu013_actores_cadena, cu014_ubicaciones
+│   │   ├── models/
+│   │   ├── views/
+│   │   └── router.py                   # Fachada que agrupa y expone los sub-routers de P3
+│   ├── p4_trazabilidad/                # Paquete 4: Inventario y Trazabilidad CORE (CU-015 al CU-024)
+│   │   ├── controllers/                # cu015_unidades, cu016_qr, cu019_envios, cu021_eventos, ...
+│   │   ├── models/
+│   │   ├── views/
+│   │   └── router.py                   # Fachada que agrupa y expone los sub-routers de P4
+│   ├── p5_comercial/                   # Paquete 5: Comercialización (CU-025 al CU-032)
+│   │   ├── controllers/                # cu032_documentos_unidad (y CUs comerciales planificados)
+│   │   ├── models/
+│   │   ├── views/
+│   │   └── router.py                   # Fachada que agrupa y expone los sub-routers de P5
+│   ├── p6_blockchain/                  # Paquete 6: Blockchain y Certificados (CU-033, CU-034)
+│   │   ├── controllers/                # cu033_blockchain, cu034_certificados
+│   │   ├── models/
+│   │   ├── views/
+│   │   └── router.py                   # Fachada que agrupa y expone los sub-routers de P6
+│   └── p7_reportes/                    # Paquete 7: Reportes e Inteligencia (CU-035)
+│       ├── controllers/
+│       ├── models/
+│       ├── views/
+│       └── router.py                   # Fachada que agrupa y expone los sub-routers de P7
+├── controllers/                        # Shims de compatibilidad hacia app/packages/
+├── models/                             # Shims de compatibilidad hacia app/packages/
+├── views/                              # Shims de compatibilidad hacia app/packages/
+└── main.py                             # Punto de entrada limpio: registra exclusivamente los 7 routers
 ```
 
-### Garantía de Estabilidad
+### Principios de la Implementación por Paquetes y MVC
 
-1. **Rutas HTTP Idénticas:** Todos los prefijos (`/api/v1/auth`, `/api/v1/units`, `/api/v1/shipments`, etc.) se preservan intactos dentro de las fachadas de paquete.
-2. **Preservación de Pruebas:** Los 120 tests automatizados de la suite de `pytest` continúan ejecutándose sobre los mismos contratos sin modificaciones forzadas.
-3. **Seams (Costuras) entre Dominios:** Si el módulo de recepción (P2) necesita crear unidades físicas (P4), invoca una interfaz de servicio en `app/services/unit_service.py` en lugar de acoplarse directamente a modelos internos ajenos.
+1. **Estructura Interna por Caso de Uso:** Dentro de cada paquete (`p1` a `p7`), cada Caso de Uso se aisla en su propio submódulo dentro de `controllers/cuXXX_...`, `models/cuXXX_...` y `views/cuXXX_...`. Esto garantiza alta cohesión funcional, límites claros de responsabilidad y navegación intuitiva.
+2. **Fachadas de Enrutamiento (`router.py`):** Cada paquete expone un único archivo `router.py` que consolida los sub-enrutadores de sus Casos de Uso. El archivo [main.py](file:///c:/Users/PERSONAL/Grupo5_si2/trazabilidad/backend/app/main.py) únicamente monta estos 7 routers canónicos bajo el prefijo `/api/v1`, reduciendo la dispersión de rutas en el bootstrap de la aplicación:
+   ```python
+   app.include_router(p1_seguridad_router, prefix="/api/v1")
+   app.include_router(p2_catalogo_router, prefix="/api/v1")
+   app.include_router(p3_actores_router, prefix="/api/v1")
+   app.include_router(p4_trazabilidad_router, prefix="/api/v1")
+   app.include_router(p5_comercial_router, prefix="/api/v1")
+   app.include_router(p6_blockchain_router, prefix="/api/v1")
+   app.include_router(p7_reportes_router, prefix="/api/v1")
+   ```
+3. **Cero Rotura de Contratos REST:** Todos los endpoints HTTP conservan sus rutas y prefijos originales (`/api/v1/auth`, `/api/v1/units`, `/api/v1/shipments`, etc.), garantizando que los clientes Angular y Flutter continúen operando sin ninguna modificación.
+4. **Shims de Compatibilidad Regresiva:** Para mantener la compatibilidad con imports históricos, tests y scripts existentes, se preservan shims en `app/controllers/`, `app/models/` y `app/views/` que redirigen de forma transparente a las rutas dentro de `app/packages/`.
+5. **Preservación y Crecimiento de Pruebas:** La suite automatizada de pruebas en pytest se mantiene 100% verde (creciendo a **162 tests verificados y aprobados**), validando tanto los módulos de S0–S2 como los nuevos servicios de Blockchain y Certificados de P6.
+6. **Seams (Costuras) entre Dominios:** Cuando un paquete requiere capacidades de otro (por ejemplo, el flujo de recepción en P2 creando unidades físicas en P4), la interacción se gestiona a través de interfaces de servicio desacopladas en `app/services/` (evitando acoplamientos circulares o mutaciones directas entre modelos de distintos paquetes).
 
 ---
 
