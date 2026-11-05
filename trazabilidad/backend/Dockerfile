@@ -6,7 +6,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Invalidate Docker cache on Railway
-ARG CACHEBUST=2026-10-06-v3-supabase
+ARG CACHEBUST=2026-11-05-v1-multipart
 ENV CACHEBUST=${CACHEBUST}
 
 COPY . .
