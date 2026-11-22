@@ -127,8 +127,11 @@ class ApiConfig {
   static String get alertSummary => '$baseUrl/alerts/summary';
   static String alertEstado(int idalerta) => '$baseUrl/alerts/$idalerta/estado';
   static String get reportSuspicion => '$baseUrl/reports/suspicion';
+  static String get reportsAnalytics => '$baseUrl/reports/analytics';
   static String get shipments => '$baseUrl/shipments';
   static String get purchases => '$baseUrl/purchases';
+  static String get consumerHistory => '$baseUrl/consumer/history';
+  static String get billingNotifications => '$baseUrl/billing/notifications';
   static String get actors => '$baseUrl/actors';
   static String get tenantCatalog => '$baseUrl/tenant-catalog';
   static String get aiVoiceReport => '$baseUrl/ai/voice-report';

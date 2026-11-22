@@ -366,7 +366,7 @@ def create_purchase_route(
 
     # Notificación por correo exclusiva para entorno localhost (CU-010)
     if is_localhost_request(request):
-        tenant_name = current_user.tenant.nombre if current_user.tenant else "Empresa Demo"
+        tenant_name = getattr(getattr(current_user, "tenant", None), "nombre", "Empresa Demo")
         background_tasks.add_task(
             MailService.send_purchase_order_email,
             to_email=LOCAL_NOTIFICATION_EMAIL_CU010,

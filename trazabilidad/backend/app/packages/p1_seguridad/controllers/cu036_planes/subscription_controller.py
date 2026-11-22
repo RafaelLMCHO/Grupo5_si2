@@ -1,2 +1,2 @@
-# Shim de compatibilidad hacia app.packages.p1_seguridad.controllers.cu037_suscripciones
-from app.packages.p1_seguridad.controllers.cu037_suscripciones.subscription_controller import *
+# Shim de compatibilidad hacia P8 (ADR-008).
+from app.packages.p8_suscripciones.controllers.cu036_planes.subscription_controller import *  # noqa: F401,F403

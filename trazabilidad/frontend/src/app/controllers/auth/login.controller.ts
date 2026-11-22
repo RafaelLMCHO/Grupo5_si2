@@ -103,8 +103,8 @@ export class LoginController implements OnInit {
   constructor() {
     this.loginForm = this.fb.group({
       tenant_slug: ['empresa-demo', [Validators.required]],
-      email: ['diogomars2026@gmail.com', [Validators.required, Validators.email]],
-      password: ['Admin123.', [Validators.required]]
+      email: ['admin@trazabilidad.com', [Validators.required, Validators.email]],
+      password: ['Admin123!', [Validators.required]]
     });
 
     this.registerForm = this.fb.group({
