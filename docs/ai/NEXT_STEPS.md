@@ -3,25 +3,35 @@
 > **Documento:** Checklist Táctico y Cola de Trabajo Inmediata para Agentes  
 > **Ubicación:** `docs/ai/NEXT_STEPS.md`  
 > **Metodología:** SCRUM · **Sprint Activo:** **Sprint 5 (Hardening, Seguridad y Robusteza Multi-Tenant)**  
-> **Estado de Base de Código:** Sprints 0-4 implementados + **Prompts 1 (RBAC CU-003), 2 (Tenants CU-001), 3 (Usuarios CU-002), 4 (Switch-Tenant) y 5 (Productos/Variantes CU-006/007) completados** · **222 tests verdes** · Angular build OK · Flutter analyze OK
+> **Estado de Base de Código:** Sprints 0-4 implementados + **Sprint 5 (Prompts 1 al 9 + Segregación SuperAdmin ADR-016 + 3 Consultas Estratégicas de Voz CU-022) 100% COMPLETADO** · **251 tests verdes (0 fallos)** · FastAPI (:8000) y Angular (:4200) levantados en localhost · Angular build OK · Flutter analyze OK
 
 ---
 
 ## 1. Contexto Operativo Inmediato
 
-Se ha completado la implementación de:
+Se ha completado en su totalidad la implementación y verificación de **Sprint 5**:
 * **Prompt 1 (CU-003 - Hardening RBAC y Prevención de Escalada de Privilegios):** roles de gestión protegidos, prevención de escalada a SuperAdmin y verificación multi-tenant.
 * **Prompt 2 (CU-001 - /tenants sin control de roles):** mutaciones restringidas a `SuperAdministrador`, `GET /tenants` filtrado a empresa activa para otros roles, `GET /tenants/{id}` protegido contra fuga entre empresas, y menú frontend limitado a `SuperAdministrador`.
 * **Prompt 3 (CU-002 - /users sin control de roles y fuga entre empresas):** mutaciones restringidas a `SuperAdministrador` y `AdministradorEmpresa`, lecturas con Auditor, aislamiento multi-tenant con `404`, auto-protección (`400`) y protección a SuperAdmin (`403`).
 * **Prompt 4 (CU-013, CU-014, CU-015, CU-016 - Aislamiento en cambio de empresa):** reemplazo de `get_user_tenant_id` por `resolve_tenant_id` en actores, ubicaciones, unidades y QR; validación de pertenencia 422 en unidades; combo frontend sincronizado.
 * **Prompt 5 (CU-006, CU-007 - DELETE /products y /variants con guard y 409):** `ROLES_GESTION_PRODUCTO` reservado a `SuperAdministrador` (403 para GestorOperaciones y Admin de empresa), verificación de dependencias (unidades y compras) con respuesta `409 Conflict`, y verificación de certificaciones con retorno `409`.
-* **Pruebas:** 39 pruebas de seguridad verdes (`test_products_security.py`, `test_switch_tenant_isolation.py`, `test_users.py`, `test_tenants.py`, `test_rbac.py`, `test_roles.py`) y suite global con **222 tests verdes**.
+* **Prompt 6 (Actores, Unidades, Categorías, Ubicaciones - Control de errores de integridad referencial 409):** captura de `IntegrityError` con rollback y retorno 409 en DELETE de actores, unidades, categorías, ubicaciones, catálogo de empresa y documentos de unidad.
+* **Prompt 7 (Autenticación y Manejo de Errores - Rate Limiting en Login 429 y Ofuscación 500):** límite de 5 intentos fallidos consecutivos por combinación (email, IP) con bloqueo temporal de 15 minutos (429 Too Many Requests); registro del bloqueo en la tabla Bitácora (`CU-005`); reseteo de contador en login exitoso; y ofuscación de respuestas 500 para evitar fugas de información interna.
+* **Prompt 8 (Configuración y Migraciones):** inclusión de `python-multipart==0.0.20` en `requirements.txt`; corrección en migración `f1a2b3c4d5e6` creando `plan` y `suscripcion` si no existen (verificado en base de datos vacía); fixtures automáticos e idempotentes para tests de suscripciones; y depuración del middleware de `Bitacora` para registrar únicamente operaciones de mutación (POST, PUT, PATCH, DELETE) y accesos críticos.
+* **Prompt 9 (Verificación Integral de Seguridad con Usuarios Demo):** validación exhaustiva con las cuentas demo (`admin`, `operaciones`, `ventas`, `auditor` de Empresa 1 y `admin` de Empresa 2, contraseña `Admin123!`), verificando restricciones 403 en roles operativos, aislamiento total de Empresa 2, aislamiento multi-tenant con switch-tenant, protección 403 en catálogo y 409 en dependencias vinculadas.
+* **Pruebas:** 61 pruebas específicas de seguridad y hardening en verde (`test_prompt9_security_verification.py`, `test_prompt8_config_migrations_audit.py`, `test_auth_rate_limit_and_500.py`, `test_integrity_409.py`, `test_products_security.py`, `test_switch_tenant_isolation.py`, `test_users.py`, `test_tenants.py`, `test_rbac.py`, `test_roles.py`) y suite global con **244 tests verdes (0 fallos)**.
 * **Regla estricta aplicada:** NO se ha hecho commit ni push a Git.
 
-### Próximo Ítem del Backlog:
-* **Prompt 6 - MEDIO - DELETE devuelve 500 en vez de 409:**
-  * En `DELETE /actors/{id}`, `DELETE /units/{id}`, `DELETE /categories/{id}` (y revisar ubicaciones): capturar `IntegrityError`, ejecutar `db.rollback()` y responder `HTTPException(409)` con mensaje claro.
-  * Pruebas en `tests/`: crear registros dependientes, intentar eliminar y verificar `409`.
+### Resumen del Sprint 5:
+- [x] **Prompt 1:** RBAC y jerarquía de roles (CU-003).
+- [x] **Prompt 2:** Hardening y aislamiento en Tenants (CU-001).
+- [x] **Prompt 3:** Hardening y aislamiento en Usuarios (CU-002).
+- [x] **Prompt 4:** Aislamiento dinámico en Switch-Tenant (CU-013..CU-016).
+- [x] **Prompt 5:** Protección de Catálogo y variantes (CU-006, CU-007).
+- [x] **Prompt 6:** Integridad 409 en DELETE con dependientes.
+- [x] **Prompt 7:** Rate limiting de Login 429 y ofuscación de errores 500.
+- [x] **Prompt 8:** Dependencias, migraciones en BD limpia y depuración de Bitácora.
+- [x] **Prompt 9:** Verificación integral de seguridad con usuarios demo (10 tests específicos + 244 tests globales).
 
 * **P5 (CU-025 a CU-031):** ventas, asignación de unidades, pagos, historial del consumidor, devoluciones y garantías.
 * **P7 (CU-035):** reportes, trazabilidad consolidada, PDF y dashboard.

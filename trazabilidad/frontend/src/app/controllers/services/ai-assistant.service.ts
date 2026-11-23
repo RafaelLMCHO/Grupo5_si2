@@ -42,8 +42,19 @@ export class AiAssistantService {
 
       this.recognition.onerror = (event: any) => {
         this.isListeningSignal.set(false);
-        if (event.error !== 'no-speech') {
-          this.errorMessageSignal.set('Error en reconocimiento de voz: ' + event.error);
+        if (event.error === 'no-speech') {
+          return;
+        }
+        if (event.error === 'network') {
+          this.errorMessageSignal.set(
+            'El navegador no pudo conectar con el servicio de reconocimiento de voz en la nube (común en Brave o con bloqueadores de privacidad). Puedes escribir tu consulta o pulsar una consulta sugerida.'
+          );
+        } else if (event.error === 'not-allowed') {
+          this.errorMessageSignal.set(
+            'Permiso de micrófono denegado en el navegador. Por favor permite el acceso al micrófono o escribe tu consulta abajo.'
+          );
+        } else {
+          this.errorMessageSignal.set('Aviso de micrófono: ' + event.error + '. Puedes escribir tu consulta directamente.');
         }
       };
     }

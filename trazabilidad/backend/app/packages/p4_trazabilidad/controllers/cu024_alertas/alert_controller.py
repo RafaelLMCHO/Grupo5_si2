@@ -33,7 +33,7 @@ from app.views.cu024_alertas.alert_views import (
 router = APIRouter(prefix="/alerts", tags=["Alertas e Incidencias (CU-024)"])
 
 # Roles autorizados a visualizar, clasificar y resolver alertas.
-ROLES_ALERTAS = ("SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones")
+ROLES_ALERTAS = ("AdministradorEmpresa", "GestorOperaciones")
 
 requires_alertas = require_roles(*ROLES_ALERTAS)
 

@@ -19,7 +19,7 @@ from app.packages.p5_comercial.views.cu030_asignacion_devolucion.return_unit_vie
 
 router = APIRouter(prefix="/returns", tags=["Unidades de Devolución (CU-030)"])
 requires_devoluciones = require_roles(
-    "SuperAdministrador", "AdministradorEmpresa", "GestorVentasPostventa"
+    "AdministradorEmpresa", "GestorVentasPostventa"
 )
 
 

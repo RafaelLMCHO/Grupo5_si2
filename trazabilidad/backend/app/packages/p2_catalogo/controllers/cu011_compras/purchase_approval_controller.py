@@ -23,7 +23,7 @@ router = APIRouter(prefix="/purchases", tags=["Aprobar / Rechazar Compras (CU-01
 LOCAL_NOTIFICATION_EMAIL_CU011 = "rafaelmontanoroca@gmail.com"
 
 # Roles autorizados a aprobar o rechazar ordenes de compra.
-ROLES_APROBACION_COMPRA = ("SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones")
+ROLES_APROBACION_COMPRA = ("AdministradorEmpresa", "GestorOperaciones")
 
 requires_compra_approval = require_roles(*ROLES_APROBACION_COMPRA)
 

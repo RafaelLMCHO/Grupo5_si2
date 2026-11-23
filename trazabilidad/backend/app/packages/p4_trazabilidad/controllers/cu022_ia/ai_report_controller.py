@@ -87,6 +87,7 @@ def export_report_document(
             period_label=cached.get("period_label", ""),
             interpretation=cached.get("interpretation", ""),
             product_detail=cached.get("product_detail"),
+            chart=cached.get("chart"),
         )
         return StreamingResponse(
             excel_buf,
@@ -108,6 +109,7 @@ def export_report_document(
             period_label=cached.get("period_label", ""),
             interpretation=cached.get("interpretation", ""),
             product_detail=cached.get("product_detail"),
+            chart=cached.get("chart"),
         )
         return StreamingResponse(
             pdf_buf,

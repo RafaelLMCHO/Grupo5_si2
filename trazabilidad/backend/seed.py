@@ -204,8 +204,8 @@ TENANTS_DATA = [
     {
         "idtenant": 1, "nombre": "iStore Bolivia S.A.",
         "razonsocial": "iStore Importaciones y Distribucion S.A.",
-        "nit": "123456789", "email": "importadora@bolivia.com", "telefono": "70000000",
-        "admin_email": "admin@trazabilidad.com",
+        "nit": "123456789", "email": "contacto@istore.com", "telefono": "70000000",
+        "admin_email": "admin@istore.com",
     },
     {
         "idtenant": 2, "nombre": "TechImport Santa Cruz S.R.L.",
@@ -230,6 +230,24 @@ TENANTS_DATA = [
         "razonsocial": "Cochabamba Wireless Sociedad Anónima",
         "nit": "654987321", "email": "contacto@cochawireless.com", "telefono": "70444444",
         "admin_email": "admin@cochawireless.com",
+    },
+    {
+        "idtenant": 7166, "nombre": "Apple Bolivia SRL",
+        "razonsocial": "Apple Bolivia Importaciones SRL",
+        "nit": "7891234560", "email": "admin@applebolivia.com", "telefono": "70112233",
+        "admin_email": "admin@applebolivia.com",
+    },
+    {
+        "idtenant": 7167, "nombre": "Sucursal Santa Cruz",
+        "razonsocial": "Sucursal Santa Cruz SRL",
+        "nit": "9871112223", "email": "contacto@sucursalscz.com", "telefono": "77889900",
+        "admin_email": "admin@sucursalscz.com",
+    },
+    {
+        "idtenant": 7168, "nombre": "RafaelStore",
+        "razonsocial": "Rafa Apple",
+        "nit": "1234552", "email": "adminrafa@trazabilidad.com", "telefono": "7805412",
+        "admin_email": "adminrafa@trazabilidad.com",
     },
 ]
 
@@ -427,10 +445,6 @@ def run_master_seed():
                 db.add(admin)
                 db.flush()
 
-            # Guardar referencia del SuperAdministrador
-            if t_data["admin_email"] == "admin@trazabilidad.com":
-                super_admin_user = admin
-
             # Vínculo UsuarioTenant
             ut = db.execute(
                 select(UsuarioTenant).where(UsuarioTenant.idusuario == admin.idusuario, UsuarioTenant.idtenant == t.idtenant)
@@ -440,8 +454,8 @@ def run_master_seed():
                 db.add(ut)
                 db.flush()
 
-            # Asignar rol
-            rol_a_asignar = roles_db_map["SuperAdministrador"] if t_data["admin_email"] == "admin@trazabilidad.com" else roles_db_map["AdministradorEmpresa"]
+            # Asignar rol: Todos los administradores de empresa reciben AdministradorEmpresa
+            rol_a_asignar = roles_db_map["AdministradorEmpresa"]
             has_rol = db.execute(
                 select(UsuarioTenantRol).where(UsuarioTenantRol.idusuariotenant == ut.idusuariotenant, UsuarioTenantRol.idrol == rol_a_asignar.idrol)
             ).scalars().first()
@@ -486,22 +500,100 @@ def run_master_seed():
                 if not has_rol_operativo:
                     db.add(UsuarioTenantRol(idusuariotenant=rol_ut.idusuariotenant, idrol=roles_db_map[rol_nombre].idrol))
 
-        # Garantizar que el SuperAdmin pertenezca a todos los tenants con rol SuperAdministrador
-        if super_admin_user:
-            super_role = roles_db_map["SuperAdministrador"]
-            for t in tenants_db:
-                ut = db.execute(
-                    select(UsuarioTenant).where(UsuarioTenant.idusuario == super_admin_user.idusuario, UsuarioTenant.idtenant == t.idtenant)
-                ).scalars().first()
-                if not ut:
-                    ut = UsuarioTenant(idusuario=super_admin_user.idusuario, idtenant=t.idtenant)
-                    db.add(ut)
-                    db.flush()
-                has_super = db.execute(
-                    select(UsuarioTenantRol).where(UsuarioTenantRol.idusuariotenant == ut.idusuariotenant, UsuarioTenantRol.idrol == super_role.idrol)
-                ).scalars().first()
-                if not has_super:
-                    db.add(UsuarioTenantRol(idusuariotenant=ut.idusuariotenant, idrol=super_role.idrol))
+        # 3.2 TENANT DE PLATAFORMA SAAS (Plano de Control exclusivo del SuperAdministrador)
+        platform_tenant = db.execute(select(Tenant).where(Tenant.nit == "000000000")).scalars().first()
+        if not platform_tenant:
+            platform_tenant = Tenant(
+                nombre="Plataforma SaaS Global",
+                razonsocial="Operador Tecnológico del Sistema de Trazabilidad",
+                nit="000000000",
+                email="soporte@trazabilidad.com",
+                telefono="00000000",
+                activo=True
+            )
+            db.add(platform_tenant)
+            db.flush()
+
+        # Crear o recuperar SuperAdministrador Global de la plataforma SaaS (independiente de cualquier empresa)
+        super_admin_email = "superadmin@trazabilidad.com"
+        super_admin_user = db.execute(select(User).where(User.email == super_admin_email)).scalars().first()
+        if not super_admin_user:
+            super_admin_user = User(
+                nombrecompleto="Super Administrador Global",
+                email=super_admin_email,
+                contrasenahash=hash_password(DEMO_PASSWORD),
+                activo=True
+            )
+            db.add(super_admin_user)
+            db.flush()
+
+        # El SuperAdmin solo pertenece al Tenant de Plataforma y NO a ninguna empresa cliente
+        super_role = roles_db_map["SuperAdministrador"]
+        ut_platform = db.execute(
+            select(UsuarioTenant).where(
+                UsuarioTenant.idusuario == super_admin_user.idusuario,
+                UsuarioTenant.idtenant == platform_tenant.idtenant
+            )
+        ).scalars().first()
+        if not ut_platform:
+            ut_platform = UsuarioTenant(idusuario=super_admin_user.idusuario, idtenant=platform_tenant.idtenant)
+            db.add(ut_platform)
+            db.flush()
+
+        has_super = db.execute(
+            select(UsuarioTenantRol).where(
+                UsuarioTenantRol.idusuariotenant == ut_platform.idusuariotenant,
+                UsuarioTenantRol.idrol == super_role.idrol
+            )
+        ).scalars().first()
+        if not has_super:
+            db.add(UsuarioTenantRol(idusuariotenant=ut_platform.idusuariotenant, idrol=super_role.idrol))
+
+        # Eliminar cualquier vínculo del SuperAdmin a empresas clientes (tenants 1 al 5)
+        client_tenant_ids = [t.idtenant for t in tenants_db]
+        uts_to_delete = db.execute(
+            select(UsuarioTenant.idusuariotenant).where(
+                UsuarioTenant.idusuario == super_admin_user.idusuario,
+                UsuarioTenant.idtenant.in_(client_tenant_ids)
+            )
+        ).scalars().all()
+        if uts_to_delete:
+            db.execute(
+                UsuarioTenantRol.__table__.delete().where(
+                    UsuarioTenantRol.idusuariotenant.in_(uts_to_delete)
+                )
+            )
+            # Reasignar registros históricos de Bitácora al vínculo de plataforma para preservar auditoría
+            try:
+                from app.packages.p1_seguridad.models.cu005_bitacora.bitacora import Bitacora
+                db.execute(
+                    Bitacora.__table__.update().where(
+                        Bitacora.idusuariotenant.in_(uts_to_delete)
+                    ).values(idusuariotenant=ut_platform.idusuariotenant)
+                )
+            except Exception:
+                pass
+
+            try:
+                db.execute(
+                    UsuarioTenant.__table__.delete().where(
+                        UsuarioTenant.idusuariotenant.in_(uts_to_delete)
+                    )
+                )
+            except Exception:
+                pass
+
+        # Retirar rol SuperAdministrador de admin@trazabilidad.com si existía previamente
+        old_admin = db.execute(select(User).where(User.email == "admin@trazabilidad.com")).scalars().first()
+        if old_admin:
+            old_uts = db.execute(select(UsuarioTenant.idusuariotenant).where(UsuarioTenant.idusuario == old_admin.idusuario)).scalars().all()
+            if old_uts:
+                db.execute(
+                    UsuarioTenantRol.__table__.delete().where(
+                        UsuarioTenantRol.idusuariotenant.in_(old_uts),
+                        UsuarioTenantRol.idrol == super_role.idrol
+                    )
+                )
 
         db.commit()
         total_operativos = len(tenants_db) * len(ROLES_USUARIOS_DEMO)
@@ -887,7 +979,9 @@ def run_master_seed():
         print("\n" + "=" * 75)
         print("SEED MAESTRO FINALIZADO CON ÉXITO")
         print("  - Contraseña de todos los usuarios demo: Admin123!")
-        print("  - SuperAdministrador: admin@trazabilidad.com")
+        print("  - SuperAdministrador Global: superadmin@trazabilidad.com")
+        print("  - Administrador Empresa 1 (iStore Bolivia): admin@istore.com")
+        print("  - Administrador Empresa 2 (TechImport): admin@techimport.com")
         print("  - Usuarios operativos (3 por empresa): operaciones@, ventas@, auditor@<dominio>")
         print("=" * 75)
 

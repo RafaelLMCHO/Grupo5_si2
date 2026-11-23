@@ -28,7 +28,7 @@ from app.views.cu016_codigos_qr.qr_views import (
 router = APIRouter(prefix="/qr", tags=["Generación y Descarga de Código QR (CU-016)"])
 
 # Roles autorizados a generar tokens QR (qr:generate en la matriz rol-permisos).
-ROLES_GENERACION_QR = ("SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones")
+ROLES_GENERACION_QR = ("AdministradorEmpresa", "GestorOperaciones")
 
 requires_generacion_qr = require_roles(*ROLES_GENERACION_QR)
 
@@ -306,7 +306,7 @@ def list_units_route(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(requires_generacion_qr)
 ):
     """Listar unidades físicas para generación o consulta de Código QR (CU-016)."""
     return QRController.list_units(db, current_user, tiene_qr, search, skip, limit)

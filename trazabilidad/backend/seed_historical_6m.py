@@ -1233,7 +1233,7 @@ def main(argv=None, *, meses: Optional[int] = None, manifest: Optional[str] = No
         print("Periodos: " + ", ".join(f"{a:04d}-{m:02d}" for a, m in periodos))
 
         tenants = db.execute(
-            select(Tenant).where(Tenant.idtenant <= 5).order_by(Tenant.idtenant)
+            select(Tenant).where(Tenant.nit != "000000000").order_by(Tenant.idtenant)
         ).scalars().all()
         cargador = Cargador(db, args.dry_run)
         for tenant in tenants:

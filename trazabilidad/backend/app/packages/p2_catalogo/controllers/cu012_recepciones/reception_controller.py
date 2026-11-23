@@ -29,7 +29,7 @@ from app.views.cu012_recepciones.reception_views import (
 router = APIRouter(prefix="/receptions", tags=["Gestionar Recepciones de Mercancia (CU-012)"])
 
 # Roles autorizados a registrar recepciones de mercancia.
-ROLES_GESTION_RECEPCION = ("SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones")
+ROLES_GESTION_RECEPCION = ("AdministradorEmpresa", "GestorOperaciones")
 
 requires_recepcion_management = require_roles(*ROLES_GESTION_RECEPCION)
 
@@ -585,7 +585,7 @@ def list_recepciones_route(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(requires_recepcion_management)
 ):
     """Listar recepciones de mercancia del tenant (CU-012)."""
     return ReceptionController.list_recepciones(db, current_user, estado, idcompra, skip, limit)
@@ -595,7 +595,7 @@ def list_recepciones_route(
 def get_recepcion_route(
     idrecepcion: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(requires_recepcion_management)
 ):
     """Obtener el detalle de una recepcion con sus productos recibidos (CU-012)."""
     return ReceptionController.get_recepcion(db, current_user, idrecepcion)

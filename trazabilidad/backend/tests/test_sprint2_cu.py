@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 from datetime import date, datetime
 from decimal import Decimal
 from sqlalchemy import select
@@ -317,7 +317,7 @@ def test_record_transport_event_with_telemetry(client, setup_test_data, seed_spr
 # ==================== TESTS CU-012: RECEPCIONES DE MERCANCIA ====================
 
 
-def test_list_receptions_empty(client, setup_test_data):
+def test_list_receptions_empty(client, setup_test_data, seed_sprint2_data):
     headers = get_auth_header(client, setup_test_data)
     response = client.get("/api/v1/receptions", headers=headers)
     assert response.status_code == 200
@@ -820,7 +820,7 @@ def test_assign_unit_blocked_when_shipment_not_in_preparacion(
     assert "preparacion" in response.json()["detail"].lower()
 
 
-def test_assign_unit_from_other_tenant_is_not_visible(client, setup_test_data, db_session):
+def test_assign_unit_from_other_tenant_is_not_visible(client, setup_test_data, seed_sprint2_data, db_session):
     """Una unidad de otra empresa nunca aparece como candidata."""
     headers = get_auth_header(client, setup_test_data)
     t2 = setup_test_data["tenant2"]

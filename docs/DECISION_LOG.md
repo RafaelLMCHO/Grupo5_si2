@@ -23,6 +23,9 @@ Este documento registra cronológicamente las decisiones arquitectónicas fundam
 * [ADR-011: Ficha detallada de producto a 36 meses y seed suplementario por tenant](#adr-011-ficha-detallada-de-producto-a-36-meses-y-seed-suplementario-por-tenant)
 * [ADR-012: Señal comercial suplementaria `HSALE` para llenar el `top 10` por período](#adr-012-señal-comercial-suplementaria-hsale-para-llenar-el-top-10-por-período)
 * [ADR-013: Stripe Checkout de pago único para ventas y facturas SaaS](#adr-013-stripe-checkout-de-pago-único-para-ventas-y-facturas-saas)
+* [ADR-014: Blindaje de Autenticación con Rate Limiting y Ofuscación de Errores 500](#adr-014-blindaje-de-autenticación-con-rate-limiting-y-ofuscación-de-errores-500)
+* [ADR-015: Idempotencia en Migraciones Alembic, Depuración de Auditoría Bitácora y Fixtures de Suscripción](#adr-015-idempotencia-en-migraciones-alembic-depuración-de-auditoría-bitácora-y-fixtures-de-suscripción-prompt-8)
+* [ADR-016: Segregación Estricta de Identidades y Bloqueo de Acceso del SuperAdministrador al Plano de Datos de Inquilinos](#adr-016-segregación-estricta-de-identidades-y-bloqueo-de-acceso-del-superadministrador-al-plano-de-datos-de-inquilinos)
 
 ---
 
@@ -218,3 +221,79 @@ Este documento registra cronológicamente las decisiones arquitectónicas fundam
     * *Positivas:* cobro online por venta y por factura con confirmación automática, auditoría y aislamiento multi-tenant; cero rotura de contratos ni de los 204 tests previos.
     * *Negativas / pendientes:* aún no hay suscripciones recurrentes ni QR de pago; la integración es **backend** (la UI web/móvil podrá redirigir a `checkout_url` en una entrega posterior); el `STRIPE_WEBHOOK_SECRET` de producción sigue pendiente de configurar.
     * *Contramedida:* 5 tests nuevos (`tests/test_stripe_pagos_cu027_cu039.py`) cubren checkout propio, venta ajena 404, firma inválida 400, webhook duplicado sin efecto, consulta de estado, reembolso y activación de suscripción. Suite completa: **209 passed, 0 failed, 0 errors**; `npm run build` y `flutter analyze` en verde.
+
+---
+
+### ADR-014: Rate Limiting en Memoria para Autenticación y Mitigación de Fuga de Información en Errores 500 (Prompt 7 / CU-004 / CU-005)
+
+* **Estado:** Aceptado
+* **Fecha:** 2026-11-23
+* **Contexto:**
+  1. `POST /auth/login` permitía intentos ilimitados con contraseñas incorrectas, exponiendo el sistema a ataques de fuerza bruta o diccionario.
+  2. Cuando ocurría un fallo no controlado (por ejemplo caída de la base de datos o pool de conexiones agotado), el manejador global devolvía `error_type`, `error_detail` y `trace`, filtrando nombres de tablas, direcciones IP de servidores y detalles internos de la base de datos al cliente HTTP.
+* **Decisión:**
+  1. **Rate Limiting en Memoria con Thread-Safety:**
+     * Se implementó `LoginRateLimiter` en `app/packages/p1_seguridad/controllers/cu004_autenticacion/auth_controller.py` utilizando `threading.Lock` para sincronización atómica entre hilos.
+     * Clave discriminadora: `(email.lower(), client_ip)`.
+     * Regla: Máximo 5 intentos fallidos consecutivos dentro de una ventana de tiempo. Al 5to fallo, se activa un bloqueo temporal de 15 minutos (`locked_until`). Todo intento subsecuente mientras dure el bloqueo responde inmediatamente con `HTTP 429 Too Many Requests`.
+     * Reset automático: un login exitoso antes de alcanzar el límite elimina la entrada de intentos fallidos.
+     * **Justificación de la elección en memoria:**
+       * *Latencia cero:* Se evalúa en microsegundos sin introducir I/O de red ni consultas adicionales a PostgreSQL en cada solicitud de inicio de sesión.
+       * *Cero migraciones:* No requiere esquemas adicionales en la base de datos ni servicios externos como Redis.
+       * *Persistencia forense:* El evento de bloqueo se persiste inmediatamente en la tabla `Bitacora` (`CU-005`) con `accion="BLOQUEO_LOGIN"`, IP y hora oficial de Bolivia, garantizando registro de auditoría durable aun si el proceso se reinicia.
+  2. **Ofuscación de Errores 500 no Controlados:**
+     * En `app/main.py`, el manejador `@app.exception_handler(Exception)` registra el detalle completo y el stack trace únicamente en los logs del servidor (`logger.error(...)`).
+     * Al cliente HTTP se responde únicamente un JSON estandarizado y genérico: `{"detail": "Error interno del servidor"}` con código HTTP 500, eliminando `error_detail`, `error_type` y `trace`.
+* **Consecuencias:**
+  * *Positivas:* Mitigación de fuerza bruta en login con bloqueo 429; auditoría en Bitácora; eliminación total de fuga de información de infraestructura en respuestas 500; suite de pruebas incrementada a **230 tests verdes (0 fallos)**.
+  * *Contramedidas:* 4 pruebas nuevas en `tests/test_auth_rate_limit_and_500.py` cubren: 5 intentos fallidos devuelven 401 y el 6to da 429; persistencia del bloqueo en Bitácora; reseteo del contador tras login exitoso; y ausencia total de `error_detail` en errores 500.
+
+---
+
+### ADR-015: Idempotencia en Migraciones Alembic, Depuración de Auditoría Bitácora y Fixtures de Suscripción (Prompt 8)
+
+* **Estado:** Aceptado
+* **Fecha:** 2026-11-23
+* **Contexto:**
+  1. `requirements.txt` no declaraba explícitamente `python-multipart`, impidiendo arrancar la API con formularios en instalaciones limpias.
+  2. `alembic upgrade head` fallaba en una base de datos vacía al ejecutar la migración `f1a2b3c4d5e6` debido a que la tabla `factura` establecía una llave foránea contra `suscripcion.idsuscripcion`, tabla que no había sido creada en ninguna migración previa.
+  3. Los tests de planes y suscripciones dependían de que se hubiera ejecutado previamente `seed_plans_subscriptions.py`.
+  4. El middleware de auditoría (`audit_logger_middleware`) registraba cada petición `GET` convencional en la tabla `Bitacora`, saturando la base de datos con lecturas rutinarias irrelevantes.
+* **Decisión:**
+  1. **Dependencia fija:** Se añadió `python-multipart==0.0.20` a `requirements.txt`.
+  2. **Creación previa en migración `f1a2b3c4d5e6`:**
+     * En `upgrade()`, se inspeccionan las tablas existentes con `sa.inspect(op.get_bind())`. Si `plan` y `suscripcion` (junto con el enum `estado_suscripcion_enum`) no existen, se crean de forma previa a la creación de `factura`, resolviendo la dependencia de clave foránea.
+     * En `downgrade()`, se eliminan de forma segura si están presentes.
+     * Se verificó la ejecución de `alembic upgrade head` contra una base de datos PostgreSQL vacía (`test_empty_migration_db`), terminando al 100% sin errores.
+  3. **Fixtures automáticos de planes y suscripciones:**
+     * Se invocó `seed_plans_and_subscriptions()` desde el fixture `setup_test_data` en `tests/conftest.py` y `ensure_seed_plans_subscriptions` en `test_subscriptions_cu036_cu037.py`. Dado que el script es idempotente, cualquier entorno de prueba sin seed previo se auto-inicializa automáticamente.
+  4. **Filtro selectivo en Bitácora (`CU-005`):**
+     * En `app/main.py`, se restringió el middleware de auditoría exclusivamente a operaciones de mutación (`POST`, `PUT`, `PATCH`, `DELETE`) y accesos críticos de seguridad (`/auth/me`, `/auth/switch-tenant`, `/backup/tenants`, `/bitacora/export`). Las lecturas `GET` convencionales ya no se persisten en la tabla `Bitacora`.
+* **Consecuencias:**
+  * *Positivas:* Migraciones 100% reproducibles en bases de datos nuevas; tests desacoplados de seeds manuales; volumen de `Bitacora` optimizado preservando solo eventos con impacto o críticos; suite global incrementada a **234 tests verdes (0 fallos)**.
+  * *Contramedidas:* 4 pruebas en `tests/test_prompt8_config_migrations_audit.py` verifican `requirements.txt`, no persistencia de GETs, registro de operaciones POST, y disponibilidad automática de fixtures de planes.
+
+---
+
+### ADR-016: Segregación Estricta de Identidades y Bloqueo de Acceso del SuperAdministrador al Plano de Datos de Inquilinos
+
+* **Estado:** Aceptado
+* **Fecha:** 2026-11-23
+* **Contexto:**
+  1. En las versiones iniciales, existía una colisión de identidad en la cual el `SuperAdministrador` compartía cuenta y vínculos multi-tenant con la Empresa 1 (`admin@istore.com` y `superadmin@trazabilidad.com`).
+  2. Adicionalmente, el requerimiento canónico de seguridad estipula que el `SuperAdministrador` de la plataforma SaaS **NO debe tener acceso a las operaciones comerciales o logísticas de ninguna empresa cliente (Data Plane)**, debiendo restringirse exclusivamente al **Plano de Control (Control Plane)**: gestión de empresas (`CU-001`), usuarios globales (`CU-002`), roles (`CU-003`), auditoría SaaS (`CU-005`), catálogo maestro Apple (`CU-006`), certificaciones globales (`CU-007`), planes y suscripciones SaaS (`CU-036`, `CU-037`), cuotas y facturación global (`CU-038`, `CU-039`), y estado del nodo blockchain (`CU-033`).
+* **Decisión:**
+  1. **Separación de Identidades (Opción A):**
+     * Creación de `platform_tenant` (`nit="000000000"`, `nombre="Plataforma SaaS Global"`).
+     * `superadmin@trazabilidad.com` queda vinculado de manera exclusiva al `platform_tenant` con rol `SuperAdministrador`.
+     * `admin@istore.com` queda como administrador exclusivo de la Empresa 1 (`idtenant = 1`) con rol `AdministradorEmpresa`.
+     * Cuentas operativas diferenciadas para Empresa 1: `operaciones@istore.com`, `ventas@istore.com`, `auditor@istore.com`.
+  2. **Gobernanza RBAC y Eliminación de Bypass en Data Plane:**
+     * En `backend/app/controllers/shared.py`, `require_roles` evalúa si el usuario activo es `SuperAdministrador`. Si `"SuperAdministrador"` NO figura expresamente entre los roles permitidos del endpoint, se lanza inmediatamente `403 Forbidden` informando: *"El SuperAdministrador de plataforma no tiene acceso a operaciones comerciales/logísticas de empresas clientes."*
+     * Se removió `SuperAdministrador` de todos los controladores operacionales (Compras `CU-010`, Aprobación `CU-011`, Recepciones `CU-012`, Actores `CU-013`, Ubicaciones `CU-014`, Unidades `CU-015`, Códigos QR `CU-016`, Envíos `CU-019`, Asignación Envíos `CU-020`, Eventos `CU-021`, Ventas `CU-025`, Pagos `CU-027`, Devoluciones `CU-029/CU-030`, Garantías `CU-031`, Documentos `CU-032`, Catálogo Interno `CU-008` y Reportes Comerciales `CU-035`).
+     * Se protegieron todos los métodos `GET` de dichos controladores con sus respectivos `requires_...` de forma que las consultas de lectura rechacen también al SuperAdmin.
+  3. **Aislamiento en Autenticación (`auth_controller.py`):**
+     * La asociación con `platform_tenant` aplica exclusivamente al SuperAdmin global (`superadmin@trazabilidad.com` o slugs de plataforma `system`, `platform`, `saas`), preservando el aislamiento tenant de cualquier usuario de empresa o test.
+* **Consecuencias:**
+  * *Positivas:* Cumplimiento estricto del modelo Zero-Trust y segregación absoluta entre Plano de Control SaaS y Plano de Datos privado de las empresas importadoras.
+  * *Validación Automatizada:* La suite completa del backend alcanza **245 pruebas 100% en verde (0 fallos, 0 errores)**, incluyendo los 11 tests de seguridad dedicados de `tests/test_prompt9_security_verification.py`.

@@ -35,7 +35,7 @@ router = APIRouter(prefix="/reports", tags=["Reportes y Dashboards (CU-035)"])
 dashboard_router = APIRouter(prefix="/dashboard", tags=["Reportes y Dashboards (CU-035)"])
 
 requires_reportes = require_roles(
-    "SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones",
+    "AdministradorEmpresa", "GestorOperaciones",
     "GestorVentasPostventa", "Auditor",
 )
 

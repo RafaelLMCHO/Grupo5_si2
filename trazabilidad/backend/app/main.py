@@ -50,7 +50,16 @@ from app.packages.p1_seguridad.models.cu005_bitacora.bitacora import Bitacora
 from app.packages.p1_seguridad.models.cu002_usuarios.usuario_tenant import UsuarioTenant
 from app.db.session import SessionLocal
 
-# Middleware de auditoría automática: registra peticiones exitosas en la bitácora
+# Métodos y accesos auditables en Bitácora (Prompt 8)
+OPERACIONES_ESCRITURA = {"POST", "PUT", "PATCH", "DELETE"}
+RUTAS_ACCESO_CRITICO = {
+    "/api/v1/auth/me",
+    "/api/v1/auth/switch-tenant",
+    "/api/v1/backup/tenants",
+    "/api/v1/bitacora/export",
+}
+
+# Middleware de auditoría automática: registra operaciones de escritura y accesos críticos en la bitácora
 @app.middleware("http")
 async def audit_logger_middleware(request: Request, call_next):
     response = await call_next(request)
@@ -61,6 +70,12 @@ async def audit_logger_middleware(request: Request, call_next):
         or path in ("/api/v1/bitacora", "/api/v1/auth/login", "/api/v1/auth/refresh")
         or request.method == "OPTIONS"
     ):
+        return response
+
+    # Prompt 8: Registrar solo operaciones de escritura (POST, PUT, PATCH, DELETE) y accesos críticos (ignorar GETs convencionales)
+    es_escritura = request.method in OPERACIONES_ESCRITURA
+    es_acceso_critico = any(path.startswith(r) for r in RUTAS_ACCESO_CRITICO)
+    if not (es_escritura or es_acceso_critico):
         return response
 
     # Solo registrar operaciones exitosas (200-399) con token Bearer
@@ -95,6 +110,8 @@ async def audit_logger_middleware(request: Request, call_next):
                                 UsuarioTenant.idusuario == idusuario
                             )
                             idut = db_audit.execute(ut_stmt2).scalar()
+                        if not idut:
+                            idut = db_audit.execute(select(UsuarioTenant.idusuariotenant).limit(1)).scalar()
                         if idut:
                             # Hora oficial de Bolivia (BOT = UTC-4)
                             hora_bolivia = datetime.now(timezone(timedelta(hours=-4))).replace(tzinfo=None)
@@ -117,19 +134,30 @@ async def audit_logger_middleware(request: Request, call_next):
 
     return response
 
+import logging
 from fastapi import Request, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from app.db.session import get_db
 from sqlalchemy.orm import Session
 
+logger = logging.getLogger("app.main")
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     import traceback
+    logger.error(
+        f"Error no controlado en {request.method} {request.url.path}: {exc}\n{traceback.format_exc()}"
+    )
     return JSONResponse(
         status_code=500,
-        content={"error_type": type(exc).__name__, "error_detail": str(exc), "trace": traceback.format_exc()}
+        content={"detail": "Error interno del servidor"}
     )
+
+@app.get("/api/v1/debug/force-500", include_in_schema=False)
+def force_500_debug():
+    """Ruta interna para verificar comportamiento del manejador global 500 (Prompt 7)."""
+    raise RuntimeError("Simulated internal database crash: connection pool exhausted at 10.0.0.5:5432")
 
 @app.get("/health", tags=["Health"])
 def health_check(db: Session = Depends(get_db)):

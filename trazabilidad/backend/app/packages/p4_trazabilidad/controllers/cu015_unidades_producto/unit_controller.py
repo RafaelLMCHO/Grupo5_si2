@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, or_
+from sqlalchemy.exc import IntegrityError
 
 from app.db.session import get_db
 from app.models.cu015_unidades_producto.unit import UnidadProducto
@@ -22,7 +23,7 @@ from app.views.cu015_unidades_producto.unit_views import (
 router = APIRouter(tags=["Gestionar Unidades de Producto Serial/IMEI (CU-015)"])
 
 # Roles autorizados a registrar y dar de baja unidades (units:create).
-ROLES_GESTION_UNIDAD = ("SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones")
+ROLES_GESTION_UNIDAD = ("AdministradorEmpresa", "GestorOperaciones")
 
 # Además de los anteriores, GestorVentasPostventa puede actualizar estado/custodia
 # (units:update: devoluciones, garantías y venta de unidades).
@@ -216,9 +217,16 @@ class UnitController:
         if not unit:
             raise HTTPException(status_code=404, detail=f"Unidad {idunidad} no encontrada.")
 
-        db.delete(unit)
-        db.commit()
-        return {"detail": f"Unidad {idunidad} eliminada."}
+        try:
+            db.delete(unit)
+            db.commit()
+            return {"detail": f"Unidad {idunidad} eliminada."}
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar: tiene registros relacionados."
+            )
 
 
 # Endpoints (Rutas HTTP)
@@ -230,7 +238,7 @@ def get_units(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(requires_gestion_unidad)
 ):
     """Listar unidades físicas registradas (Serial/IMEI) (CU-015)."""
     return UnitController.list_units(db, current_user, search, estado, idvariante, skip, limit)

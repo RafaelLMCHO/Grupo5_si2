@@ -84,7 +84,7 @@ def is_localhost_request(request: Optional[Request] = None) -> bool:
 
 
 # Roles autorizados a crear y editar ordenes de compra.
-ROLES_GESTION_COMPRA = ("SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones")
+ROLES_GESTION_COMPRA = ("AdministradorEmpresa", "GestorOperaciones")
 
 requires_compra_management = require_roles(*ROLES_GESTION_COMPRA)
 
@@ -337,7 +337,7 @@ def list_purchases_route(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(requires_compra_management)
 ):
     """Listar órdenes de compra de la empresa autenticada (CU-010)."""
     return PurchaseController.list_purchases(db, current_user, estado, skip, limit)
@@ -347,7 +347,7 @@ def list_purchases_route(
 def get_purchase_route(
     idcompra: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(requires_compra_management)
 ):
     """Obtener detalle completo de una orden de compra (CU-010)."""
     return PurchaseController.get_purchase(db, current_user, idcompra)

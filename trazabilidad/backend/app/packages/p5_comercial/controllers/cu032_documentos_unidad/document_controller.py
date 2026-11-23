@@ -12,6 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.db.session import get_db
 from app.models.cu002_usuarios.user import User
@@ -39,7 +40,7 @@ from app.views.cu032_documentos_unidad.document_views import (
 
 router = APIRouter(prefix="/documents", tags=["Documentos de Unidad (CU-032)"])
 
-ROLES_DOCUMENTOS = ("SuperAdministrador", "AdministradorEmpresa", "GestorVentasPostventa")
+ROLES_DOCUMENTOS = ("AdministradorEmpresa", "GestorVentasPostventa")
 requires_documentos = require_roles(*ROLES_DOCUMENTOS)
 
 _TIPOS_VALIDOS = set(TIPO_DOCUMENTO_ENUM.enums)
@@ -268,8 +269,15 @@ class DocumentoController:
         DocumentoController._registrar_bitacora(
             db, user, "ELIMINAR_DOCUMENTO", documento.iddocumento, get_client_ip(request)
         )
-        db.delete(documento)
-        db.commit()
+        try:
+            db.delete(documento)
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar: tiene registros relacionados."
+            )
 
 
 # Endpoints API REST
@@ -294,7 +302,7 @@ def attach_document_route(
 def list_by_unidad_route(
     idunidad: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(requires_documentos),
 ):
     """Listar los documentos de una unidad (CU-032)."""
     return DocumentoController.list_by_unidad(db, current_user, idunidad)
@@ -307,7 +315,7 @@ def list_documents_route(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(requires_documentos),
 ):
     """Listar documentos de la empresa (CU-032)."""
     return DocumentoController.list_documents(db, current_user, tipodocumento, idunidad, skip, limit)
@@ -317,7 +325,7 @@ def list_documents_route(
 def get_document_route(
     iddocumento: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(requires_documentos),
 ):
     """Detalle de un documento (CU-032)."""
     return DocumentoController.get_document(db, current_user, iddocumento)
@@ -328,7 +336,7 @@ def verify_document_route(
     iddocumento: int,
     body: VerifyDocumentoRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(requires_documentos),
 ):
     """Verificar la integridad de un documento por su hash (CU-032)."""
     return DocumentoController.verify_document(db, current_user, iddocumento, body)

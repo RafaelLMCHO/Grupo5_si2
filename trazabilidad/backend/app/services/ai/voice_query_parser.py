@@ -22,34 +22,71 @@ _NUMEROS = {
 
 _INTENTES = [
     (
+        "inventario",
+        (
+            "stock", "inventario", "almacen", "existencia", "existencias",
+            "cuanto stock", "cuantas unidades", "cuantos dispositivos",
+            "stock disponible", "unidades en almacen",
+        ),
+    ),
+    (
+        "rentabilidad",
+        (
+            "margen de ganancia", "mayor margen", "margen comercial",
+            "mas rentable", "mas rentables", "rentabilidad", "beneficio neto",
+            "utilidad", "ganancia", "ganancias", "ganamos", "margen",
+        ),
+    ),
+    (
+        "blockchain",
+        (
+            "blockchain", "notarizad", "notarizacion", "anclaje", "on-chain",
+            "hash blockchain", "sospecha", "falsificacion", "alerta de riesgo",
+            "alertas de riesgo", "certificados de autenticidad", "autenticidad",
+            "alerta", "alertas",
+        ),
+    ),
+    (
+        "garantias",
+        (
+            "garantia", "garantias", "devolucion", "devoluciones", "tasa de falla",
+            "tasa de devolucion", "reclamos de garantia", "motivos de devolucion",
+            "defectuoso", "defectuosos", "postventa", "falla", "reclamo", "reclamos",
+        ),
+    ),
+    (
         "ventas",
         (
-            "mas vendido", "vendido", "venta", "ranking", "top", "factur",
-            "mejor producto", "mayor ingreso", "ingresos", "rentable",
-            "clientes que mas compran", "unidades vendidas",
+            "mas vendido", "mas vendidos", "vendido", "vendidos", "venta", "ventas",
+            "ranking", "top", "factur", "facturacion", "mejor producto", "mejores productos",
+            "mayor ingreso", "ingresos", "clientes que mas compran", "unidades vendidas",
         ),
     ),
     (
         "compras",
-        ("compra", "orden", "proveedor", "adquisicion", "gasto", "pedido", "factura de compra"),
+        ("compra", "compras", "orden", "ordenes", "proveedor", "proveedores", "adquisicion", "gasto", "gastos", "pedido", "pedidos", "factura de compra"),
     ),
     (
         "logistica",
         (
-            "envio", "transporte", "despacho", "telemetria", "sensor",
-            "temperatura", "humedad", "vibracion", "ruta", "tracking", "camion",
+            "envio", "envios", "transporte", "despacho", "despachos", "telemetria", "sensor", "sensores",
+            "temperatura", "humedad", "vibracion", "ruta", "rutas", "tracking", "camion", "camiones",
         ),
     ),
     (
         "auditoria",
         (
-            "auditoria", "bitacora", "seguridad", "direccion ip",
-            "intentos de acceso", "inicios de sesion", "quien accedio",
+            "auditoria", "bitacora", "seguridad", "direccion ip", "ip",
+            "intentos de acceso", "inicios de sesion", "inicio sesion", "login",
+            "quien accedio", "quien ingreso", "quien inicio sesion",
         ),
     ),
 ]
 
 _ESTADOS = {
+    "disponible": ("disponible", "disponibles", "en stock", "en almacen"),
+    "en_transito": ("en transito", "en_transito", "en camino"),
+    "vendido": ("vendido", "vendidos", "vendida", "vendidas"),
     "pendiente": ("pendiente", "pendientes"),
     "pagada": ("pagada", "pagadas", "pagado", "pagados"),
     "enviada": ("enviada", "enviadas", "enviado", "enviados"),
@@ -131,6 +168,8 @@ def _rango_dias(now: datetime, dias: int) -> Tuple[datetime, datetime, str]:
 
 def parse_period(q: str, now: datetime) -> Tuple[Optional[datetime], Optional[datetime], str]:
     """Devuelve ``(desde, hasta, etiqueta)``; ``hasta`` es exclusivo."""
+    if any(k in q for k in ("reciente", "recientes", "ultimos despachos", "ultimos envios", "recientemente")):
+        return None, None, "recientes"
     if any(k in q for k in ("hoy", "este dia")):
         return _rango_dias(now, 1)
     if any(k in q for k in ("ayer", "dia anterior")):
@@ -241,7 +280,13 @@ class ParsedQuery:
         partes: List[str] = []
         if self.wants_detail:
             partes.append("Análisis detallado de producto (36 meses)")
-        if self.limit:
+        if self.intent == "rentabilidad":
+            partes.append(f"Top {self.limit} por margen de rentabilidad" if self.limit else "Análisis de rentabilidad y margen comercial")
+        elif self.intent == "garantias":
+            partes.append("Control de calidad, garantías y devoluciones")
+        elif self.intent == "blockchain":
+            partes.append("Seguridad, notarización Blockchain y alertas")
+        elif self.limit:
             partes.append(f"Top {self.limit} por {self.metric}")
         elif self.intent == "ventas":
             partes.append(f"Ranking por {self.metric}")
@@ -266,6 +311,9 @@ def parse_query(query: str, now: Optional[datetime] = None) -> ParsedQuery:
     estado = None
     for canonico, variantes in _ESTADOS.items():
         if any(variante in q for variante in variantes):
+            # 'vendido' en consultas de ventas, rentabilidad, etc., describe la actividad, no un filtro de estado de orden
+            if intent in ("ventas", "rentabilidad", "garantias", "compras") and canonico == "vendido":
+                continue
             estado = canonico
             break
 

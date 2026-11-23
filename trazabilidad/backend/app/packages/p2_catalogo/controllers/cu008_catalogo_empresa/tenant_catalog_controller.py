@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from sqlalchemy import select, func, or_
+from sqlalchemy.exc import IntegrityError
 
 
 
@@ -48,12 +49,11 @@ router = APIRouter(tags=["Gestionar Cat├ílogo por Empresa (CU-008)"])
 
 # Roles autorizados a modificar el catálogo interno de la empresa
 # (tenant_catalog:manage en la matriz rol-permisos).
-ROLES_GESTION_CATALOGO_EMPRESA = ("SuperAdministrador", "AdministradorEmpresa")
+ROLES_GESTION_CATALOGO_EMPRESA = ("AdministradorEmpresa",)
+ROLES_LECTURA_CATALOGO_EMPRESA = ("AdministradorEmpresa", "GestorOperaciones", "GestorVentasPostventa", "Auditor")
 
 requires_gestion_catalogo_empresa = require_roles(*ROLES_GESTION_CATALOGO_EMPRESA)
-
-
-
+requires_lectura_catalogo_empresa = require_roles(*ROLES_LECTURA_CATALOGO_EMPRESA)
 
 
 @router.post(
@@ -64,7 +64,7 @@ requires_gestion_catalogo_empresa = require_roles(*ROLES_GESTION_CATALOGO_EMPRES
 def generate_tenant_catalog_recommendations(
     data: PricingRecommendationRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(requires_gestion_catalogo_empresa),
 ):
     """Genera recomendaciones de pricing e inventario para el catalogo del tenant (CU-008 + IA)."""
     return TenantCatalogController.generate_recommendations(db, current_user, data)
@@ -274,11 +274,16 @@ class TenantCatalogController:
 
 
 
-        db.delete(item)
-
-        db.commit()
-
-        return {"detail": f"Item {idcatalogotenant} removido del cat├ílogo."}
+        try:
+            db.delete(item)
+            db.commit()
+            return {"detail": f"Item {idcatalogotenant} removido del catálogo."}
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar: tiene registros relacionados."
+            )
 
 
 
@@ -308,7 +313,7 @@ def get_tenant_catalog(
 
     db: Session = Depends(get_db),
 
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(requires_lectura_catalogo_empresa)
 
 ):
 

@@ -7,6 +7,8 @@ from app.db.session import get_db
 from app.packages.p1_seguridad.models.cu002_usuarios.user import User
 from app.packages.p1_seguridad.models.cu001_tenants.tenant import Tenant
 from app.packages.p1_seguridad.models.cu002_usuarios.usuario_tenant import UsuarioTenant
+from app.models.cu003_roles_permisos.role import Role
+from app.models.cu003_roles_permisos.usuario_tenant_rol import UsuarioTenantRol
 from app.core.security import hash_password, validate_password_strength
 from app.packages.p1_seguridad.controllers.cu004_autenticacion.auth_controller import get_current_user
 from app.packages.p1_seguridad.views.cu002_usuarios.user_views import (
@@ -78,6 +80,14 @@ class UserController:
         else:
             active_tenant_id = resolve_tenant_id(db, current_user)
             query = query.join(UsuarioTenant, UsuarioTenant.idusuario == User.idusuario).where(UsuarioTenant.idtenant == active_tenant_id)
+            # Administrador de empresa u otros roles no deben ver a los SuperAdministradores en su lista
+            stmt_super_users = (
+                select(UsuarioTenant.idusuario)
+                .join(UsuarioTenantRol, UsuarioTenantRol.idusuariotenant == UsuarioTenant.idusuariotenant)
+                .join(Role, Role.idrol == UsuarioTenantRol.idrol)
+                .where(Role.nombrerol == "SuperAdministrador")
+            )
+            query = query.where(~User.idusuario.in_(stmt_super_users))
 
         if search and search.strip():
             term = f"%{search.strip().lower()}%"
@@ -164,6 +174,12 @@ class UserController:
 
         # Aislamiento: salvo SuperAdministrador, solo ver usuarios de su empresa activa
         if not _es_superadmin(db, current_user):
+            # AdministradorEmpresa no debe poder consultar detalles de SuperAdministradores
+            if _es_superadmin(db, user):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Usuario con ID {idusuario} no encontrado."
+                )
             active_tenant_id = resolve_tenant_id(db, current_user)
             stmt_link = select(UsuarioTenant.idusuariotenant).where(
                 UsuarioTenant.idusuario == idusuario,

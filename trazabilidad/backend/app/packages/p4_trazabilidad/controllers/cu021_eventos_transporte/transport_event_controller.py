@@ -33,7 +33,7 @@ from app.views.cu021_eventos_transporte.transport_views import (
 router = APIRouter(prefix="/shipments", tags=["Eventos y Condiciones de Transporte (CU-021)"])
 
 # Roles autorizados a registrar hitos de trazabilidad y telemetría (shipments:telemetry).
-ROLES_EVENTOS_TRANSPORTE = ("SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones")
+ROLES_EVENTOS_TRANSPORTE = ("AdministradorEmpresa", "GestorOperaciones")
 
 requires_eventos_transporte = require_roles(*ROLES_EVENTOS_TRANSPORTE)
 
@@ -286,7 +286,7 @@ class TransportEventController:
 def get_timeline_route(
     idenvio: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(requires_eventos_transporte)
 ):
     """Obtener línea de tiempo completa y condiciones de un envío (CU-021)."""
     return TransportEventController.get_timeline(db, current_user, idenvio)

@@ -27,7 +27,7 @@ from app.services.unit_state_service import unit_availability_service
 
 router = APIRouter(prefix="/returns", tags=["Devoluciones (CU-029)"])
 
-ROLES_DEVOLUCIONES = ("SuperAdministrador", "AdministradorEmpresa", "GestorVentasPostventa")
+ROLES_DEVOLUCIONES = ("AdministradorEmpresa", "GestorVentasPostventa")
 requires_devoluciones = require_roles(*ROLES_DEVOLUCIONES)
 _MOTIVOS = set(MOTIVO_DEVOLUCION_ENUM.enums)
 _ESTADOS = set(ESTADO_DEVOLUCION_ENUM.enums)

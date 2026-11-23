@@ -21,7 +21,7 @@ from app.packages.p5_comercial.views.cu031_garantias.warranty_views import (
 
 router = APIRouter(prefix="/warranties", tags=["Garantías por Unidad (CU-031)"])
 requires_garantias = require_roles(
-    "SuperAdministrador", "AdministradorEmpresa", "GestorVentasPostventa"
+    "AdministradorEmpresa", "GestorVentasPostventa"
 )
 
 

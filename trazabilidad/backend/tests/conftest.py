@@ -81,6 +81,13 @@ def setup_test_data(db_session):
     db_session.add_all([ut1, ut2])
     db_session.commit()
 
+    # Prompt 8: Asegurar que existan planes y suscripciones para pruebas
+    try:
+        from seed_plans_subscriptions import seed_plans_and_subscriptions
+        seed_plans_and_subscriptions()
+    except Exception as e:
+        print(f"[Seed Plans/Subscriptions fixture warning]: {e}")
+
     return {"tenant1": t1, "tenant2": t2, "user1": u1, "user2": u2}
 
 
@@ -93,29 +100,31 @@ def auth_headers(client, db_session, setup_test_data):
     u1 = setup_test_data["user1"]
     t1 = setup_test_data["tenant1"]
 
-    rol = db_session.execute(
-        select(Role).where(Role.nombrerol == "SuperAdministrador")
-    ).scalar_one_or_none()
-    if not rol:
-        rol = Role(nombrerol="SuperAdministrador", descripcion="Super administrador (test)")
-        db_session.add(rol)
-        db_session.flush()
-
     ut1 = db_session.execute(
         select(UsuarioTenant).where(
             UsuarioTenant.idusuario == u1.idusuario,
             UsuarioTenant.idtenant == t1.idtenant,
         )
     ).scalar_one()
-    ya_asignado = db_session.execute(
-        select(UsuarioTenantRol).where(
-            UsuarioTenantRol.idusuariotenant == ut1.idusuariotenant,
-            UsuarioTenantRol.idrol == rol.idrol,
-        )
-    ).scalar_one_or_none()
-    if not ya_asignado:
-        db_session.add(UsuarioTenantRol(idusuariotenant=ut1.idusuariotenant, idrol=rol.idrol))
-        db_session.commit()
+
+    for r_name in ["SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones", "GestorVentasPostventa"]:
+        r_obj = db_session.execute(
+            select(Role).where(Role.nombrerol == r_name)
+        ).scalar_one_or_none()
+        if not r_obj:
+            r_obj = Role(nombrerol=r_name, descripcion=f"{r_name} (test)")
+            db_session.add(r_obj)
+            db_session.flush()
+
+        ya_asig = db_session.execute(
+            select(UsuarioTenantRol).where(
+                UsuarioTenantRol.idusuariotenant == ut1.idusuariotenant,
+                UsuarioTenantRol.idrol == r_obj.idrol,
+            )
+        ).scalar_one_or_none()
+        if not ya_asig:
+            db_session.add(UsuarioTenantRol(idusuariotenant=ut1.idusuariotenant, idrol=r_obj.idrol))
+    db_session.commit()
 
     resp = client.post(
         "/api/v1/auth/login",

@@ -2,6 +2,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, or_
+from sqlalchemy.exc import IntegrityError
 
 from app.db.session import get_db
 from app.models.cu013_actores_cadena.actor import ActorCadena
@@ -18,7 +19,7 @@ from app.views.cu013_actores_cadena.actor_views import (
 router = APIRouter(tags=["Gestionar Actores de la Cadena (CU-013)"])
 
 # Roles autorizados a crear/editar/eliminar actores de la cadena (actors:manage).
-ROLES_GESTION_ACTOR = ("SuperAdministrador", "AdministradorEmpresa")
+ROLES_GESTION_ACTOR = ("AdministradorEmpresa", "GestorOperaciones")
 
 requires_gestion_actor = require_roles(*ROLES_GESTION_ACTOR)
 
@@ -117,9 +118,16 @@ class ActorController:
         if not actor:
             raise HTTPException(status_code=404, detail=f"Actor {idactor} no encontrado.")
 
-        db.delete(actor)
-        db.commit()
-        return {"detail": f"Actor {idactor} eliminado."}
+        try:
+            db.delete(actor)
+            db.commit()
+            return {"detail": f"Actor {idactor} eliminado."}
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar: tiene registros relacionados."
+            )
 
 
 # Endpoints (Rutas HTTP)
@@ -130,7 +138,7 @@ def get_actors(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(requires_gestion_actor)
 ):
     """Listar actores de la cadena de suministro (CU-013)."""
     return ActorController.list_actors(db, current_user, search, tipoactor, skip, limit)

@@ -34,6 +34,131 @@ from app.packages.p1_seguridad.views.cu004_autenticacion.auth_views import (
 )
 from app.packages.p1_seguridad.views.cu002_usuarios.user_views import UserResponse
 from app.packages.p1_seguridad.views.cu001_tenants.tenant_views import TenantResponse
+import threading
+from dataclasses import dataclass
+from typing import Dict, Tuple
+
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_MINUTES = 15
+
+@dataclass
+class LoginAttemptState:
+    failed_attempts: int = 0
+    locked_until: Optional[datetime] = None
+
+
+class LoginRateLimiter:
+    """Controlador en memoria de intentos de login fallidos y bloqueo temporal por IP + Email.
+    
+    Elección técnica: Almacenamiento en memoria con threading.Lock para latencia mínima
+    y cero dependencias de I/O o migraciones adicionales de base de datos.
+    """
+    def __init__(self, max_attempts: int = MAX_LOGIN_ATTEMPTS, lockout_minutes: int = LOCKOUT_MINUTES):
+        self.max_attempts = max_attempts
+        self.lockout_minutes = lockout_minutes
+        self._lock = threading.Lock()
+        self._attempts: Dict[Tuple[str, str], LoginAttemptState] = {}
+
+    def _key(self, email: str, ip: str) -> Tuple[str, str]:
+        return (email.strip().lower(), ip.strip())
+
+    def check_rate_limit(self, email: str, ip: str) -> Tuple[bool, Optional[int]]:
+        """Verifica si la tupla (email, ip) se encuentra temporalmente bloqueada."""
+        key = self._key(email, ip)
+        now = datetime.now(timezone.utc)
+        with self._lock:
+            state = self._attempts.get(key)
+            if not state:
+                return False, None
+            if state.locked_until:
+                if now < state.locked_until:
+                    remaining = int((state.locked_until - now).total_seconds())
+                    return True, max(1, remaining)
+                else:
+                    # El bloqueo expiró, limpiar estado
+                    del self._attempts[key]
+                    return False, None
+            return False, None
+
+    def record_failure(self, email: str, ip: str) -> Tuple[bool, int]:
+        """Registra un intento fallido. Bloquea si alcanza el límite de intentos."""
+        key = self._key(email, ip)
+        now = datetime.now(timezone.utc)
+        with self._lock:
+            state = self._attempts.get(key)
+            if not state:
+                state = LoginAttemptState(failed_attempts=1)
+                self._attempts[key] = state
+            else:
+                if state.locked_until and now >= state.locked_until:
+                    state.failed_attempts = 1
+                    state.locked_until = None
+                else:
+                    state.failed_attempts += 1
+
+            if state.failed_attempts >= self.max_attempts:
+                state.locked_until = now + timedelta(minutes=self.lockout_minutes)
+                return True, state.failed_attempts
+            return False, state.failed_attempts
+
+    def record_success(self, email: str, ip: str) -> None:
+        """Limpia los intentos fallidos tras un inicio de sesión exitoso."""
+        key = self._key(email, ip)
+        with self._lock:
+            self._attempts.pop(key, None)
+
+    def reset(self, email: Optional[str] = None, ip: Optional[str] = None) -> None:
+        """Reinicia los contadores (útil para pruebas y tareas administrativas)."""
+        with self._lock:
+            if email is not None and ip is not None:
+                self._attempts.pop(self._key(email, ip), None)
+            else:
+                self._attempts.clear()
+
+
+login_rate_limiter = LoginRateLimiter(max_attempts=MAX_LOGIN_ATTEMPTS, lockout_minutes=LOCKOUT_MINUTES)
+
+
+def _registrar_bloqueo_bitacora(db: Session, email: str, ip: str) -> None:
+    """Registrar evento de bloqueo por fuerza bruta en la Bitácora (CU-005)."""
+    try:
+        from app.packages.p1_seguridad.models.cu005_bitacora.bitacora import Bitacora
+        from app.packages.p1_seguridad.models.cu002_usuarios.user import User
+        from app.packages.p1_seguridad.models.cu002_usuarios.usuario_tenant import UsuarioTenant
+
+        email_clean = email.strip().lower()
+        stmt_u = select(User).where(func.lower(User.email) == email_clean)
+        user = db.execute(stmt_u).scalar_one_or_none()
+
+        idut = None
+        idusuario = None
+        if user:
+            idusuario = user.idusuario
+            stmt_ut = select(UsuarioTenant.idusuariotenant).where(UsuarioTenant.idusuario == user.idusuario)
+            idut = db.execute(stmt_ut).scalars().first()
+
+        if not idut:
+            stmt_first = select(UsuarioTenant.idusuariotenant).limit(1)
+            idut = db.execute(stmt_first).scalar()
+
+        if idut:
+            # Hora oficial de Bolivia (BOT = UTC-4)
+            hora_bolivia = datetime.now(timezone(timedelta(hours=-4))).replace(tzinfo=None)
+            bitacora_entry = Bitacora(
+                idusuariotenant=idut,
+                accion="BLOQUEO_LOGIN",
+                entidad="Autenticacion",
+                identidad=idusuario,
+                ip=ip,
+                fechahora=hora_bolivia
+            )
+            db.add(bitacora_entry)
+            db.commit()
+    except Exception as e:
+        db.rollback()
+        import logging
+        logging.getLogger(__name__).warning(f"[Bitacora Bloqueo Error]: {e}")
+
 
 security_scheme = HTTPBearer()
 
@@ -45,7 +170,13 @@ class AuthController:
     def _find_tenant(db: Session, tenant_slug: str) -> Optional[Tenant]:
         clean_slug = tenant_slug.strip().lower()
         
-        # 0. Coincidencia por alias demo predeterminado
+        # 0. Coincidencia por alias demo predeterminado o plataforma
+        if clean_slug in ("system", "platform", "plataforma", "0", "saas"):
+            stmt_plat = select(Tenant).where(Tenant.nit == "000000000")
+            plat = db.execute(stmt_plat).scalar_one_or_none()
+            if plat:
+                return plat
+
         if clean_slug in ("empresa-demo", "demo", "default"):
             stmt_first = select(Tenant).where(Tenant.activo != False).order_by(Tenant.idtenant)
             first_tenant = db.execute(stmt_first).scalars().first()
@@ -102,17 +233,36 @@ class AuthController:
                 detail="Empresa o credenciales inválidas."
             )
 
-        # Verificar vinculación con la empresa en la tabla usuariotenant
-        stmt_link = select(UsuarioTenant).where(
-            UsuarioTenant.idusuario == user.idusuario,
-            UsuarioTenant.idtenant == tenant.idtenant
-        )
-        link = db.execute(stmt_link).scalar_one_or_none()
-        if not link:
-            # Si no existe el vínculo, crearlo para garantizar el acceso multiempresa
-            link = UsuarioTenant(idusuario=user.idusuario, idtenant=tenant.idtenant)
-            db.add(link)
-            db.commit()
+        # Si el usuario es el SuperAdministrador global de plataforma (o inicia sesión vía slug de plataforma)
+        clean_slug = tenant_slug.strip().lower()
+        is_platform_superadmin = (user.email == "superadmin@trazabilidad.com") or (clean_slug in ("system", "platform", "plataforma", "0", "saas"))
+
+        if is_platform_superadmin:
+            stmt_plat = select(Tenant).where(Tenant.nit == "000000000")
+            plat = db.execute(stmt_plat).scalar_one_or_none()
+            if plat:
+                tenant = plat
+            stmt_link = select(UsuarioTenant).where(
+                UsuarioTenant.idusuario == user.idusuario,
+                UsuarioTenant.idtenant == tenant.idtenant
+            )
+            link = db.execute(stmt_link).scalar_one_or_none()
+            if not link:
+                link = UsuarioTenant(idusuario=user.idusuario, idtenant=tenant.idtenant)
+                db.add(link)
+                db.commit()
+        else:
+            # Verificar vinculación con la empresa en la tabla usuariotenant
+            stmt_link = select(UsuarioTenant).where(
+                UsuarioTenant.idusuario == user.idusuario,
+                UsuarioTenant.idtenant == tenant.idtenant
+            )
+            link = db.execute(stmt_link).scalar_one_or_none()
+            if not link:
+                # Si no existe el vínculo, crearlo para garantizar el acceso multiempresa
+                link = UsuarioTenant(idusuario=user.idusuario, idtenant=tenant.idtenant)
+                db.add(link)
+                db.commit()
 
         if not verify_password(password, user.contrasenahash):
             raise HTTPException(
@@ -459,16 +609,17 @@ class AuthController:
         access_token = create_access_token(access_token_payload)
 
         # Vincular SuperAdministrador a la empresa si no estuviera vinculado,
-        # asignando el rol SuperAdministrador dentro del nuevo vinculo.
+        # asignando roles operativos dentro del nuevo vinculo para permitir gestion.
         if not link:
             link = UsuarioTenant(idusuario=current_user.idusuario, idtenant=tenant.idtenant)
             db.add(link)
             db.flush()
-            rol_super = db.execute(
-                select(Role).where(Role.nombrerol == "SuperAdministrador")
-            ).scalars().first()
-            if rol_super:
-                db.add(UsuarioTenantRol(idusuariotenant=link.idusuariotenant, idrol=rol_super.idrol))
+            for r_name in ["SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones"]:
+                rol_obj = db.execute(
+                    select(Role).where(Role.nombrerol == r_name)
+                ).scalars().first()
+                if rol_obj:
+                    db.add(UsuarioTenantRol(idusuariotenant=link.idusuariotenant, idrol=rol_obj.idrol))
             db.commit()
 
         current_user.tenant = TenantResponse.model_validate(tenant)
@@ -493,11 +644,35 @@ def login(
     db: Session = Depends(get_db)
 ):
     """Autenticar usuario y retornar token de acceso JWT y cookie de refresco HttpOnly."""
-    access_token, raw_refresh_token, user, tenant = AuthController.authenticate_user(
-        db, credentials.tenant_slug, credentials.email, credentials.password
+    client_ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "127.0.0.1")
     )
+    email_clean = credentials.email.strip().lower()
 
-    # Registrar evento real en Bitácora con Hora de Bolivia (BOT, UTC-4)
+    # 1. Verificar si la IP + Email se encuentra temporalmente bloqueada por intentos fallidos
+    is_locked, remaining_seconds = login_rate_limiter.check_rate_limit(email_clean, client_ip)
+    if is_locked:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos fallidos. Cuenta temporalmente bloqueada por 15 minutos."
+        )
+
+    try:
+        access_token, raw_refresh_token, user, tenant = AuthController.authenticate_user(
+            db, credentials.tenant_slug, credentials.email, credentials.password
+        )
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+            is_now_locked, attempts = login_rate_limiter.record_failure(email_clean, client_ip)
+            if is_now_locked:
+                _registrar_bloqueo_bitacora(db, email_clean, client_ip)
+        raise exc
+
+    # 2. Si la autenticación fue exitosa, reiniciar contador de intentos fallidos
+    login_rate_limiter.record_success(email_clean, client_ip)
+
+    # 3. Registrar evento real en Bitácora con Hora de Bolivia (BOT, UTC-4)
     try:
         from app.packages.p1_seguridad.models.cu005_bitacora.bitacora import Bitacora
         ut_stmt = select(UsuarioTenant.idusuariotenant).where(
@@ -512,10 +687,6 @@ def login(
             idut = db.execute(ut_stmt2).scalar()
 
         if idut:
-            client_ip = (
-                request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-                or (request.client.host if request.client else "127.0.0.1")
-            )
             hora_bolivia = datetime.now(timezone(timedelta(hours=-4))).replace(tzinfo=None)
             db.add(Bitacora(
                 idusuariotenant=idut,

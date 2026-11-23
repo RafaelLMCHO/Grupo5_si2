@@ -19,6 +19,73 @@ from reportlab.platypus import (
     KeepTogether,
     HRFlowable,
 )
+from reportlab.graphics.shapes import Drawing, Rect, String, Line
+from reportlab.graphics.charts.piecharts import Pie
+from reportlab.graphics.charts.barcharts import VerticalBarChart
+
+
+def build_chart_drawing(chart: Optional[Dict[str, Any]]) -> Optional[Drawing]:
+    """Construye un gráfico vectorial ReportLab a partir de la estructura ChartData."""
+    if not chart or not chart.get("labels") or not chart.get("datasets"):
+        return None
+    labels = chart.get("labels", [])
+    datasets = chart.get("datasets", [])
+    if not datasets or not datasets[0].get("data"):
+        return None
+    data = datasets[0].get("data", [])
+    ctype = chart.get("chart_type", "bar")
+
+    palette = [
+        colors.HexColor("#0284C7"),
+        colors.HexColor("#10B981"),
+        colors.HexColor("#F59E0B"),
+        colors.HexColor("#818CF8"),
+        colors.HexColor("#EF4444"),
+        colors.HexColor("#06B6D4"),
+        colors.HexColor("#EC4899"),
+    ]
+
+    if ctype == "pie":
+        d = Drawing(540, 130)
+        pie = Pie()
+        pie.x = 60
+        pie.y = 10
+        pie.width = 110
+        pie.height = 110
+        clean_data = [float(v) for v in data[:5] if float(v) > 0]
+        clean_labels = [str(l)[:16] for l in labels[:len(clean_data)]]
+        if not clean_data:
+            return None
+        pie.data = clean_data
+        pie.labels = clean_labels
+        for idx in range(len(pie.data)):
+            pie.slices[idx].fillColor = palette[idx % len(palette)]
+            pie.slices[idx].strokeColor = colors.white
+            pie.slices[idx].strokeWidth = 1
+            pie.slices[idx].labelRadius = 1.05
+        pie.slices.fontName = "Helvetica"
+        pie.slices.fontSize = 7
+        d.add(pie)
+        return d
+    else:
+        d = Drawing(540, 135)
+        bc = VerticalBarChart()
+        bc.x = 45
+        bc.y = 25
+        bc.height = 95
+        bc.width = 460
+        clean_data = [float(v) for v in data[:6]]
+        bc.data = [clean_data]
+        bc.categoryAxis.categoryNames = [str(l)[:12] for l in labels[:len(clean_data)]]
+        bc.categoryAxis.labels.fontSize = 7
+        bc.categoryAxis.labels.fontName = "Helvetica"
+        bc.categoryAxis.labels.dy = -10
+        bc.valueAxis.labels.fontSize = 7
+        bc.valueAxis.labels.fontName = "Helvetica"
+        bc.bars[0].fillColor = colors.HexColor("#0284C7")
+        bc.bars[0].strokeColor = None
+        d.add(bc)
+        return d
 
 
 def generate_excel_bytes(
@@ -35,6 +102,8 @@ def generate_excel_bytes(
     period_label: Optional[str] = None,
     interpretation: Optional[str] = None,
     product_detail: Optional[Dict[str, Any]] = None,
+    chart: Optional[Dict[str, Any]] = None,
+    **kwargs: Any,
 ) -> io.BytesIO:
     """
     Genera un archivo Excel (.xlsx) profesional, formateado y estilizado.
@@ -237,6 +306,7 @@ def generate_pdf_bytes(
     period_label: Optional[str] = None,
     interpretation: Optional[str] = None,
     product_detail: Optional[Dict[str, Any]] = None,
+    chart: Optional[Dict[str, Any]] = None,
 ) -> io.BytesIO:
     """
     Genera un informe PDF corporativo de alta calidad con membrete multi-tenant,
@@ -419,6 +489,16 @@ def generate_pdf_bytes(
         ]))
         story.append(t_detalle)
         story.append(Spacer(1, 14))
+
+    # 4c. Representación Gráfica Vectorial
+    if chart and chart.get("labels"):
+        chart_drawing = build_chart_drawing(chart)
+        if chart_drawing:
+            chart_title_text = str(chart.get("title", "Resumen Gráfico Analítico"))
+            story.append(Paragraph(f"<b>📊 {escape(chart_title_text)}</b>", ParagraphStyle("ChartTitle", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=10, textColor=brand_blue)))
+            story.append(Spacer(1, 4))
+            story.append(chart_drawing)
+            story.append(Spacer(1, 14))
 
     # 5. Tabla de Datos
     if table_headers and table_rows:

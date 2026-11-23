@@ -23,7 +23,7 @@ from app.packages.p5_comercial.views.cu028_historial_consumidor.consumer_history
 
 router = APIRouter(prefix="/consumer", tags=["Historial del Consumidor (CU-028)"])
 requires_historial = require_roles(
-    "SuperAdministrador", "AdministradorEmpresa", "Consumidor", "Auditor"
+    "AdministradorEmpresa", "Consumidor", "Auditor"
 )
 
 

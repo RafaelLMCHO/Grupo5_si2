@@ -26,7 +26,7 @@ from app.views.cu019_envios_logisticos.shipment_views import (
 router = APIRouter(prefix="/shipments", tags=["Gestión de Envíos Logísticos (CU-019)"])
 
 # Roles autorizados a crear, editar y mover envíos.
-ROLES_GESTION_ENVIO = ("SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones")
+ROLES_GESTION_ENVIO = ("AdministradorEmpresa", "GestorOperaciones")
 
 requires_shipment_management = require_roles(*ROLES_GESTION_ENVIO)
 
@@ -329,7 +329,7 @@ def list_shipments_route(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(requires_shipment_management)
 ):
     """Listar envíos logísticos del tenant (CU-019)."""
     return ShipmentController.list_shipments(db, current_user, estado, skip, limit)
@@ -339,7 +339,7 @@ def list_shipments_route(
 def get_shipment_route(
     idenvio: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(requires_shipment_management)
 ):
     """Obtener el detalle de un envío con sus unidades asignadas (CU-019)."""
     return ShipmentController.get_shipment(db, current_user, idenvio)

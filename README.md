@@ -102,8 +102,8 @@ flutter run
 
 | Rol / Alcance | Correo Electrónico | Empresa Asignada | Tenant Slug |
 | :--- | :--- | :--- | :---: |
-| **SuperAdministrador Global** | `admin@trazabilidad.com` | *Acceso irrestricto a todas las empresas* | `1` |
-| **Admin Empresa 1** | `admin@trazabilidad.com` | iStore Bolivia S.A. | `1` |
+| **SuperAdministrador Global** | `superadmin@trazabilidad.com` | *Acceso irrestricto a todas las empresas* | `1` |
+| **Admin Empresa 1** | `admin@istore.com` | iStore Bolivia S.A. | `1` |
 | **Admin Empresa 2** | `admin@techimport.com` | TechImport Santa Cruz S.R.L. | `2` |
 | **Admin Empresa 3** | `admin@andinadigital.com` | Andina Digital Ltda. | `3` |
 | **Admin Empresa 4** | `admin@electrosur.com` | ElectroSur Trading S.A. | `4` |
@@ -112,13 +112,13 @@ flutter run
 ### Usuarios operativos por empresa (CU-002)
 
 Un usuario por cada rol operativo en cada empresa (3 roles x 5 tenants = 15 cuentas).
-El correo se deriva del dominio del administrador de la empresa.
+El correo se deriva del dominio corporativo de la empresa.
 
 | Rol | Empresa | Correo Electrónico | Tenant Slug |
 | :--- | :--- | :--- | :---: |
-| **Gestor de Operaciones** | iStore Bolivia S.A. | `operaciones@trazabilidad.com` | `1` |
-| **Gestor de Ventas y Postventa** | iStore Bolivia S.A. | `ventas@trazabilidad.com` | `1` |
-| **Auditor** | iStore Bolivia S.A. | `auditor@trazabilidad.com` | `1` |
+| **Gestor de Operaciones** | iStore Bolivia S.A. | `operaciones@istore.com` | `1` |
+| **Gestor de Ventas y Postventa** | iStore Bolivia S.A. | `ventas@istore.com` | `1` |
+| **Auditor** | iStore Bolivia S.A. | `auditor@istore.com` | `1` |
 | **Gestor de Operaciones** | TechImport Santa Cruz S.R.L. | `operaciones@techimport.com` | `2` |
 | **Gestor de Ventas y Postventa** | TechImport Santa Cruz S.R.L. | `ventas@techimport.com` | `2` |
 | **Auditor** | TechImport Santa Cruz S.R.L. | `auditor@techimport.com` | `2` |

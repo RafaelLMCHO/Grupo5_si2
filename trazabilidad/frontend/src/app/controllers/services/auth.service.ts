@@ -46,9 +46,6 @@ export class AuthService {
 
   hasAnyRole(roleNames: string[]): boolean {
     const roles = this.currentUser()?.roles || [];
-    if (roles.includes('SuperAdministrador')) {
-      return true;
-    }
     return roleNames.some(r => roles.includes(r));
   }
 

@@ -162,18 +162,7 @@
       </a>
       }
 
-      <!-- Selector de empresa (Solo para SuperAdministrador) -->
-      @if (canAccess('tenants') && tenants().length > 0) {
-      <select [value]="currentUser()?.tenant?.idtenant" (change)="onTenantChange($event)"
-        style="background: #1e293b; color: #38bdf8; border: 1px solid #0284c7; padding: 0.35rem 0.6rem; border-radius: 6px; font-weight: 600; font-size: 0.8rem; cursor: pointer; max-width: 220px;"
-        title="Cambiar contexto de empresa activa">
-        @for (t of tenants(); track t.idtenant) {
-        <option [value]="t.idtenant" [selected]="t.idtenant === currentUser()?.tenant?.idtenant">
-          🏢 {{ t.nombre }} (NIT: {{ t.nit }})
-        </option>
-        }
-      </select>
-      } @else if (currentUser()?.tenant) {
+      @if (currentUser()?.tenant) {
       <span style="background: #1e293b; color: #38bdf8; border: 1px solid #334155; padding: 0.35rem 0.6rem; border-radius: 6px; font-weight: 600; font-size: 0.8rem;">
         🏢 {{ currentUser()?.tenant?.nombre }}
       </span>
@@ -382,6 +371,125 @@
               <div [style.color]="k.color || '#38bdf8'" style="font-size: 1.25rem; font-weight: 800; margin: 0.2rem 0;">{{ k.value }}</div>
               @if (k.trend) {
               <span style="color: #64748b; font-size: 0.7rem;">{{ k.trend }}</span>
+              }
+            </div>
+            }
+          </div>
+          }
+
+          <!-- Visualización Gráfica Interactiva -->
+          @if (r.chart && r.chart.labels && r.chart.labels.length > 0) {
+          <div style="background: #1e293b; border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 14px; padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #334155; padding-bottom: 0.6rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 1.2rem;">
+                  {{ r.chart.chart_type === 'line' ? '📈' : (r.chart.chart_type === 'pie' ? '🍩' : '📊') }}
+                </span>
+                <h4 style="margin: 0; color: #ffffff; font-size: 0.95rem; font-weight: 700;">{{ r.chart.title }}</h4>
+              </div>
+              <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 12px; text-transform: uppercase;">
+                {{ r.chart.chart_type === 'line' ? 'Telemetría IoT' : (r.chart.chart_type === 'pie' ? 'Distribución' : 'Ranking') }}
+              </span>
+            </div>
+
+            <!-- Caso 1: Gráfico Donut / Pastel (Inventario, Garantías, Blockchain, Auditoría) -->
+            @if (r.chart.chart_type === 'pie') {
+            <div style="display: flex; align-items: center; justify-content: space-around; flex-wrap: wrap; gap: 1.5rem;">
+              <!-- Donut SVG -->
+              <div style="position: relative; width: 140px; height: 140px; flex-shrink: 0;">
+                <svg viewBox="0 0 100 100" style="width: 100%; height: 100%; transform: rotate(-90deg);">
+                  <circle cx="50" cy="50" r="40" fill="transparent" stroke="#334155" stroke-width="12"></circle>
+                  @for (seg of getDonutSegments(r.chart); track seg.label) {
+                  <circle cx="50" cy="50" r="40" fill="transparent"
+                    [attr.stroke]="seg.color" stroke-width="12"
+                    [attr.stroke-dasharray]="seg.strokeDasharray"
+                    [attr.stroke-dashoffset]="seg.strokeDashoffset"
+                    style="transition: all 0.5s ease;"></circle>
+                  }
+                </svg>
+                <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none;">
+                  <span style="font-size: 0.62rem; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Total</span>
+                  <span style="font-size: 1.15rem; color: #ffffff; font-weight: 800;">
+                    {{ r.table_rows ? r.table_rows.length : '' }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Leyenda con porcentaje y barra -->
+              <div style="flex: 1; min-width: 250px; display: flex; flex-direction: column; gap: 0.65rem;">
+                @for (item of getChartBars(r.chart); track item.label) {
+                <div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; margin-bottom: 0.25rem;">
+                    <div style="display: flex; align-items: center; gap: 0.45rem;">
+                      <span [style.background]="item.color" style="width: 10px; height: 10px; border-radius: 50%; display: inline-block;"></span>
+                      <span style="color: #e2e8f0; font-weight: 600;">{{ item.label }}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                      <span style="color: #94a3b8; font-size: 0.75rem;">{{ item.formatted }}</span>
+                      <span [style.color]="item.color" style="font-weight: 800; font-size: 0.82rem; min-width: 32px; text-align: right;">{{ item.pct }}%</span>
+                    </div>
+                  </div>
+                  <div style="width: 100%; height: 6px; background: #334155; border-radius: 3px; overflow: hidden;">
+                    <div [style.width.%]="item.pct" [style.background]="item.color" style="height: 100%; border-radius: 3px; transition: width 0.7s ease;"></div>
+                  </div>
+                </div>
+                }
+              </div>
+            </div>
+            }
+
+            <!-- Caso 2: Gráfico de Línea IoT (Logística y Sensores Térmicos) -->
+            @else if (r.chart.chart_type === 'line') {
+            <div style="width: 100%;">
+              <div style="height: 130px; width: 100%;">
+                <svg viewBox="0 0 500 120" preserveAspectRatio="none" style="width: 100%; height: 100%; overflow: visible;">
+                  <defs>
+                    <linearGradient id="lineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="#10B981" stop-opacity="0.35"></stop>
+                      <stop offset="100%" stop-color="#10B981" stop-opacity="0.0"></stop>
+                    </linearGradient>
+                  </defs>
+                  <!-- Rejillas -->
+                  <line x1="20" y1="20" x2="480" y2="20" stroke="#334155" stroke-dasharray="3,3" stroke-width="1"></line>
+                  <line x1="20" y1="60" x2="480" y2="60" stroke="#334155" stroke-dasharray="3,3" stroke-width="1"></line>
+                  <line x1="20" y1="100" x2="480" y2="100" stroke="#334155" stroke-dasharray="3,3" stroke-width="1"></line>
+
+                  <!-- Área y Línea -->
+                  <path [attr.d]="getLineChartData(r.chart).area" fill="url(#lineGrad)"></path>
+                  <path [attr.d]="getLineChartData(r.chart).path" fill="none" stroke="#10B981" stroke-width="3" stroke-linecap="round"></path>
+
+                  <!-- Puntos -->
+                  @for (pt of getLineChartData(r.chart).points; track pt.label) {
+                  <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="4.5" fill="#10B981" stroke="#0f172a" stroke-width="2"></circle>
+                  }
+                </svg>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.72rem; color: #94a3b8; overflow-x: hidden;">
+                @for (lbl of r.chart.labels.slice(0, 6); track lbl) {
+                <span style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 80px;">{{ lbl }}</span>
+                }
+              </div>
+            </div>
+            }
+
+            <!-- Caso 3: Gráfico de Barras Horizontales (Ventas, Rentabilidad, Compras) -->
+            @else {
+            <div style="display: flex; flex-direction: column; gap: 0.7rem;">
+              @for (bar of getChartBars(r.chart); track bar.label) {
+              <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; margin-bottom: 0.25rem;">
+                  <span style="color: #e2e8f0; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 65%;">
+                    {{ bar.label }}
+                  </span>
+                  <span [style.color]="bar.color" style="font-weight: 800; font-size: 0.85rem;">
+                    {{ bar.formatted }}
+                  </span>
+                </div>
+                <div style="width: 100%; height: 8px; background: #334155; border-radius: 4px; overflow: hidden;">
+                  <div [style.width.%]="bar.barPct" [style.background]="bar.color"
+                    style="height: 100%; border-radius: 4px; transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);"></div>
+                </div>
+              </div>
               }
             </div>
             }

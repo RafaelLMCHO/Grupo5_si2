@@ -2,6 +2,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.db.session import get_db
 from app.models.cu009_categorias.category import Categoria
@@ -69,9 +70,16 @@ class CategoryController:
                 detail=f"Categoría con ID {idcategoria} no encontrada."
             )
 
-        db.delete(cat)
-        db.commit()
-        return {"detail": f"Categoría {idcategoria} eliminada exitosamente."}
+        try:
+            db.delete(cat)
+            db.commit()
+            return {"detail": f"Categoría {idcategoria} eliminada exitosamente."}
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar: tiene registros relacionados."
+            )
 
 
 # Endpoints (Rutas HTTP)

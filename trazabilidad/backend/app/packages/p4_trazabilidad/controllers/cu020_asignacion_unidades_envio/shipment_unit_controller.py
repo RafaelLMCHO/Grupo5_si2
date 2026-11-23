@@ -29,7 +29,7 @@ router = APIRouter(prefix="/shipments", tags=["Asignar / Desasignar Unidades a E
 # despachado, el contenido del envio es inmutable.
 ESTADOS_ASIGNABLES = {"preparacion"}
 
-ROLES_GESTION_ENVIO = ("SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones")
+ROLES_GESTION_ENVIO = ("AdministradorEmpresa", "GestorOperaciones")
 
 requires_shipment_management = require_roles(*ROLES_GESTION_ENVIO)
 
@@ -343,7 +343,7 @@ class ShipmentUnitController:
 def list_unidades_route(
     idenvio: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(requires_shipment_management)
 ):
     """Listar las unidades asignadas al envio y las candidatas disponibles (CU-020)."""
     return ShipmentUnitController.list_unidades(db, current_user, idenvio)

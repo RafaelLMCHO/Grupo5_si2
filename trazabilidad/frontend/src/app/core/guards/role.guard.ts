@@ -10,10 +10,6 @@ export const roleGuard = (allowedRoles: string[]): CanActivateFn => {
     const user = authService.currentUser();
     const roles = user?.roles || [];
 
-    if (roles.includes('SuperAdministrador')) {
-      return true;
-    }
-
     const hasAccess = allowedRoles.some(r => roles.includes(r));
     if (hasAccess) {
       return true;

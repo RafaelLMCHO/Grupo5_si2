@@ -1,6 +1,13 @@
 import pytest
 from app.models.cu001_tenants.tenant import Tenant
 from app.packages.p1_seguridad.models.cu036_planes.subscription_models import Plan, Suscripcion
+from seed_plans_subscriptions import seed_plans_and_subscriptions
+
+
+@pytest.fixture(autouse=True)
+def ensure_seed_plans_subscriptions(db_session, setup_test_data):
+    """Garantiza que existan planes y suscripciones antes de ejecutar las pruebas (Prompt 8)."""
+    seed_plans_and_subscriptions()
 
 
 def login(client, tenant_slug, email, password):

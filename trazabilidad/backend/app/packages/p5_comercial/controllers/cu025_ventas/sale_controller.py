@@ -27,7 +27,7 @@ from app.services.unit_state_service import unit_availability_service
 
 router = APIRouter(prefix="/sales", tags=["Ventas y Postventa (CU-025/CU-026)"])
 
-ROLES_VENTAS = ("SuperAdministrador", "AdministradorEmpresa", "GestorVentasPostventa")
+ROLES_VENTAS = ("AdministradorEmpresa", "GestorVentasPostventa")
 requires_ventas = require_roles(*ROLES_VENTAS)
 _ESTADOS = set(ESTADO_VENTA_ENUM.enums)
 

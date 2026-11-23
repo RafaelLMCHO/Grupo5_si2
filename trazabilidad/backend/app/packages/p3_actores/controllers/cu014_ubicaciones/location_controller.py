@@ -2,6 +2,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, or_
+from sqlalchemy.exc import IntegrityError
 
 from app.db.session import get_db
 from app.models.cu014_ubicaciones.location import Ubicacion
@@ -19,7 +20,7 @@ from app.views.cu014_ubicaciones.location_views import (
 router = APIRouter(tags=["Gestionar Ubicaciones Físicas (CU-014)"])
 
 # Roles autorizados a crear/editar/eliminar ubicaciones (locations:manage).
-ROLES_GESTION_UBICACION = ("SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones")
+ROLES_GESTION_UBICACION = ("AdministradorEmpresa", "GestorOperaciones")
 
 requires_gestion_ubicacion = require_roles(*ROLES_GESTION_UBICACION)
 
@@ -134,9 +135,16 @@ class LocationController:
         if not loc:
             raise HTTPException(status_code=404, detail=f"Ubicación {idubicacion} no encontrada.")
 
-        db.delete(loc)
-        db.commit()
-        return {"detail": f"Ubicación {idubicacion} eliminada."}
+        try:
+            db.delete(loc)
+            db.commit()
+            return {"detail": f"Ubicación {idubicacion} eliminada."}
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar: tiene registros relacionados."
+            )
 
 
 # Endpoints (Rutas HTTP)
@@ -147,7 +155,7 @@ def get_locations(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(requires_gestion_ubicacion)
 ):
     """Listar ubicaciones físicas (CU-014)."""
     return LocationController.list_locations(db, current_user, search, tipo, skip, limit)

@@ -2,14 +2,14 @@
 
 > **Documento:** Snapshot Técnico y Contexto Operativo para Agentes de IA  
 > **Ubicación:** `docs/ai/CURRENT_STATE.md`  
-> **Última Actualización:** 2026-11-22 (Sprint 5: Prompts 1, 2, 3, 4 y 5 completados [RBAC, Tenants, Usuarios, Switch-Tenant y Productos/Variantes]; Panel Integral 36 meses + Asistente de Informes personalizable + Ficha Detallada de Producto + Señal comercial `HSALE` para `top 10`: Backend + Web + Móvil; Stripe Checkout de pago único en Backend)  
+> **Última Actualización:** 2026-11-23 (Resolución Integral del Asistente por Voz CU-022: Integración de gráficos vectoriales interactivos SVG en frontend y ReportLab en exportación PDF; corrección de firma en generador Excel con 252 tests verdes al 100%; diagnóstico y guía para error 'network' de Web Speech API)  
 > **Branch Principal:** `main` (o rama de desarrollo activa)
 
 ---
 
 ## 1. Resumen Ejecutivo de la Base de Código
 
-* **Estado de la Suite de Pruebas:** **222 PASSED | 0 FAILED | 0 ERRORS** (100% verde en PostgreSQL; 39 tests de seguridad en `test_products_security.py`, `test_switch_tenant_isolation.py`, `test_users.py`, `test_tenants.py`, `test_rbac.py` y `test_roles.py`).
+* **Estado de la Suite de Pruebas:** **252 PASSED | 0 FAILED | 0 ERRORS** (100% verde en PostgreSQL; 69 tests específicos de seguridad, integridad, rate limiting, migraciones, auditoría, consultas inteligentes de voz y gráficos vectoriales en `test_ai_voice_new_queries.py`, `test_ai_voice_query_customization.py`, etc.).
 * **Base de Datos:** PostgreSQL local `Blockchain` (misma instancia que usan la app y los tests); migraciones aplicadas hasta `c7d8e9f0a1b2` (Stripe, pago único). No existe una BD `blacktest` configurada en el código.
 * **Empaquetado Modular (ADR-003 + ADR-008):**
   * **P1** `app/packages/p1_seguridad/` — CU-001 a CU-005 (incluye hardening en `/tenants` CU-001, hardening en `/users` CU-002, hardening RBAC en CU-003 y el push de CU-005 en `/notifications/push`).

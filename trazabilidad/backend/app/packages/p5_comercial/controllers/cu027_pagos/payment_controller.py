@@ -25,7 +25,7 @@ from app.services.payments.stripe_webhook import procesar_evento
 
 router = APIRouter(prefix="/payments", tags=["Pagos de Ventas (CU-027)"])
 
-ROLES_PAGOS = ("SuperAdministrador", "AdministradorEmpresa", "GestorVentasPostventa")
+ROLES_PAGOS = ("AdministradorEmpresa", "GestorVentasPostventa")
 requires_pagos = require_roles(*ROLES_PAGOS)
 _METODOS = set(METODO_PAGO_ENUM.enums)
 _ESTADOS = set(ESTADO_PAGO_ENUM.enums)
