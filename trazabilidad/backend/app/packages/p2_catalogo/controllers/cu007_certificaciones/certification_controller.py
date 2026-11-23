@@ -1,7 +1,8 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 
 from app.db.session import get_db
 from app.models.cu007_certificaciones.certification import Certificacion, ProductoCertificacion
@@ -83,9 +84,26 @@ class CertificationController:
                 detail=f"Certificación con ID {idcertificacion} no encontrada."
             )
 
-        db.delete(cert)
-        db.commit()
-        return {"detail": f"Certificación {idcertificacion} eliminada exitosamente."}
+        stmt_links = select(func.count(ProductoCertificacion.idproductocertificacion)).where(
+            ProductoCertificacion.idcertificacion == idcertificacion
+        )
+        count_links = db.execute(stmt_links).scalar() or 0
+        if count_links > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar la certificación: está asignada a productos del catálogo."
+            )
+
+        try:
+            db.delete(cert)
+            db.commit()
+            return {"detail": f"Certificación {idcertificacion} eliminada exitosamente."}
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar la certificación: tiene registros relacionados."
+            )
 
     # 5. Listar certificaciones asignadas a un producto
     @staticmethod

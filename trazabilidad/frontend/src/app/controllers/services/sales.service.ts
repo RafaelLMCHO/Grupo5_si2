@@ -4,7 +4,8 @@ import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   Venta, VentaListResponse, CreateVentaRequest, AssignUnitsRequest, UpdateEstadoRequest,
-  Pago, PagoListResponse, CreatePagoRequest, HistorialConsumidorResponse
+  Pago, PagoListResponse, CreatePagoRequest, HistorialConsumidorResponse,
+  CheckoutResponse, CheckoutStatusResponse
 } from '../../models/sprint4.model';
 
 @Injectable({ providedIn: 'root' })
@@ -62,6 +63,18 @@ export class SalesService {
 
   createPago(body: CreatePagoRequest): Observable<Pago> {
     return this.http.post<Pago>(this.paymentsUrl, body);
+  }
+
+  checkoutVenta(idventa: number): Observable<CheckoutResponse> {
+    return this.http.post<CheckoutResponse>(`${this.paymentsUrl}/checkout`, { idventa });
+  }
+
+  getCheckoutStatus(idpago: number): Observable<CheckoutStatusResponse> {
+    return this.http.get<CheckoutStatusResponse>(`${this.paymentsUrl}/${idpago}/checkout`);
+  }
+
+  refundPago(idpago: number): Observable<Pago> {
+    return this.http.post<Pago>(`${this.paymentsUrl}/${idpago}/refund`, {});
   }
 
   updatePagoEstado(idpago: number, body: UpdateEstadoRequest): Observable<Pago> {

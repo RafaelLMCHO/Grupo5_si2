@@ -144,9 +144,49 @@ export class SalesManagementController implements OnInit {
     });
   }
 
-  openPago(): void {
-    this.pagoForm = { idventa: this.ventas()[0]?.idventa ?? 0, metodopago: 'efectivo', monto: '0.00', estado: 'completado' };
+  openPago(idventa?: number): void {
+    this.pagoForm = { idventa: idventa ?? this.ventas()[0]?.idventa ?? 0, metodopago: 'efectivo', monto: '0.00', estado: 'completado' };
     this.isPagoOpen.set(true);
+  }
+
+  onPayWithStripe(venta: Venta): void {
+    if (Number(venta.saldo) <= 0) {
+      this.fail({ error: { detail: 'La venta ya no tiene saldo pendiente por cobrar.' } });
+      return;
+    }
+    this.ok(`Iniciando sesión de pago con Stripe para la Venta #${venta.idventa}...`);
+    this.salesService.checkoutVenta(venta.idventa).subscribe({
+      next: (res) => {
+        if (res.checkout_url) {
+          window.location.href = res.checkout_url;
+        } else {
+          this.fail({ error: { detail: 'No se obtuvo la URL de pago de Stripe.' } });
+        }
+      },
+      error: (e) => this.fail(e)
+    });
+  }
+
+  onPayWithStripeFromModal(): void {
+    const idv = Number(this.pagoForm.idventa);
+    if (!idv) {
+      this.fail({ error: { detail: 'Debe seleccionar una venta.' } });
+      return;
+    }
+    const v = this.ventas().find(item => item.idventa === idv);
+    if (v) {
+      this.onPayWithStripe(v);
+    } else {
+      this.ok(`Iniciando sesión de pago con Stripe para la Venta #${idv}...`);
+      this.salesService.checkoutVenta(idv).subscribe({
+        next: (res) => {
+          if (res.checkout_url) {
+            window.location.href = res.checkout_url;
+          }
+        },
+        error: (e) => this.fail(e)
+      });
+    }
   }
 
   onCreatePago(): void {

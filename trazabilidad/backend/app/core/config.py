@@ -46,6 +46,15 @@ class Settings(BaseSettings):
     BLOCKCHAIN_CONFIRMATIONS: int = 1
     BLOCKCHAIN_TIMEOUT_SECONDS: int = 30
 
+    # ── Stripe Checkout (CU-027 / CU-037 / CU-039) ──────────────────────────
+    # Pago único para ventas y facturas. Las llaves se leen de .env y nunca
+    # se versionan. Si no están definidas, los endpoints responden 503.
+    STRIPE_SECRET_KEY: Optional[str] = None
+    STRIPE_WEBHOOK_SECRET: Optional[str] = None
+    STRIPE_SUCCESS_URL: str = "http://localhost:4200/pagos/exitoso"
+    STRIPE_CANCEL_URL: str = "http://localhost:4200/pagos/cancelado"
+    STRIPE_WEBHOOK_TOLERANCE_SECONDS: int = 300
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

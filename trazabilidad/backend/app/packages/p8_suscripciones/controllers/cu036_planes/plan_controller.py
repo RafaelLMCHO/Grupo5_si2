@@ -39,13 +39,15 @@ class PlanController:
 @router.get("", response_model=PlanListResponse, summary="Listar catálogo de planes")
 def list_planes(
     activo: Optional[bool] = Query(None, description="Filtrar por estado activo/inactivo"),
+    solo_activos: Optional[bool] = Query(None, description="Compatibilidad para planes activos"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(_requires_lectura_planes),
 ):
     stmt = select(Plan)
-    if activo is not None:
+    if solo_activos or activo is True:
+        stmt = stmt.where(Plan.activo == True)
+    elif activo is not None:
         stmt = stmt.where(Plan.activo == activo)
 
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0

@@ -2,14 +2,26 @@
 
 > **Documento:** Checklist Táctico y Cola de Trabajo Inmediata para Agentes  
 > **Ubicación:** `docs/ai/NEXT_STEPS.md`  
-> **Metodología:** SCRUM · **Sprint Activo:** **Sprint 4 (cerrado en backend/web/móvil)**  
-> **Estado de Base de Código:** Sprints 0, 1, 2, 3 y 4 implementados + Panel Integral 36 meses + Asistente de Informes personalizable + Ficha Detallada de Producto · **202 tests verdes** · Angular build OK · Flutter analyze OK
+> **Metodología:** SCRUM · **Sprint Activo:** **Sprint 5 (Hardening, Seguridad y Robusteza Multi-Tenant)**  
+> **Estado de Base de Código:** Sprints 0-4 implementados + **Prompts 1 (RBAC CU-003), 2 (Tenants CU-001), 3 (Usuarios CU-002), 4 (Switch-Tenant) y 5 (Productos/Variantes CU-006/007) completados** · **222 tests verdes** · Angular build OK · Flutter analyze OK
 
 ---
 
 ## 1. Contexto Operativo Inmediato
 
-El Sprint 4 quedó implementado de extremo a extremo:
+Se ha completado la implementación de:
+* **Prompt 1 (CU-003 - Hardening RBAC y Prevención de Escalada de Privilegios):** roles de gestión protegidos, prevención de escalada a SuperAdmin y verificación multi-tenant.
+* **Prompt 2 (CU-001 - /tenants sin control de roles):** mutaciones restringidas a `SuperAdministrador`, `GET /tenants` filtrado a empresa activa para otros roles, `GET /tenants/{id}` protegido contra fuga entre empresas, y menú frontend limitado a `SuperAdministrador`.
+* **Prompt 3 (CU-002 - /users sin control de roles y fuga entre empresas):** mutaciones restringidas a `SuperAdministrador` y `AdministradorEmpresa`, lecturas con Auditor, aislamiento multi-tenant con `404`, auto-protección (`400`) y protección a SuperAdmin (`403`).
+* **Prompt 4 (CU-013, CU-014, CU-015, CU-016 - Aislamiento en cambio de empresa):** reemplazo de `get_user_tenant_id` por `resolve_tenant_id` en actores, ubicaciones, unidades y QR; validación de pertenencia 422 en unidades; combo frontend sincronizado.
+* **Prompt 5 (CU-006, CU-007 - DELETE /products y /variants con guard y 409):** `ROLES_GESTION_PRODUCTO` reservado a `SuperAdministrador` (403 para GestorOperaciones y Admin de empresa), verificación de dependencias (unidades y compras) con respuesta `409 Conflict`, y verificación de certificaciones con retorno `409`.
+* **Pruebas:** 39 pruebas de seguridad verdes (`test_products_security.py`, `test_switch_tenant_isolation.py`, `test_users.py`, `test_tenants.py`, `test_rbac.py`, `test_roles.py`) y suite global con **222 tests verdes**.
+* **Regla estricta aplicada:** NO se ha hecho commit ni push a Git.
+
+### Próximo Ítem del Backlog:
+* **Prompt 6 - MEDIO - DELETE devuelve 500 en vez de 409:**
+  * En `DELETE /actors/{id}`, `DELETE /units/{id}`, `DELETE /categories/{id}` (y revisar ubicaciones): capturar `IntegrityError`, ejecutar `db.rollback()` y responder `HTTPException(409)` con mensaje claro.
+  * Pruebas en `tests/`: crear registros dependientes, intentar eliminar y verificar `409`.
 
 * **P5 (CU-025 a CU-031):** ventas, asignación de unidades, pagos, historial del consumidor, devoluciones y garantías.
 * **P7 (CU-035):** reportes, trazabilidad consolidada, PDF y dashboard.
@@ -35,6 +47,8 @@ No quedan CUs pendientes del listado Sprint 4. Se agregó el **Panel Integral po
 - [x] Aislamiento multi-tenant de `POST /billing/notifications/process` (CU-040) corregido y cubierto por test.
 - [x] Asistente de informes (CU-022, ADR-010): parser + ranking ventas + fechas en todos los intentos + auditoría por tenant + 404 en exportación ajena; 7 tests nuevos (suite 198), chips y badge en web/móvil; build y analyze OK.
 - [x] Ficha detallada de producto (CU-022, ADR-011): `product_detail` aditivo con 36 meses fijos, métricas filtradas por tenant, tarjeta web/móvil y sección PDF/Excel; seed suplementario idempotente (20.401 IDs, 0 filas en re-ejecución); 4 tests nuevos (suite 202); build y analyze OK.
+- [x] Poblado completo del `top 10` (CU-022, ADR-012): bloque `HSALE` con hasta 10 productos reales distintos por tenant × 36 meses, devoluciones para los productos base, manifest 41.838 IDs, `--dry-run` con 0 filas nuevas, 10/10 filas en los 5 tenants y 50/50 fichas sin métricas en cero; 2 tests nuevos (suite 204); build y analyze OK.
+- [x] **Stripe pago único (CU-027/CU-039, ADR-013):** gateway compartido, `POST /payments/checkout`, `GET /payments/{idpago}/checkout`, `POST /payments/{idpago}/refund`, `POST /invoices/{idfactura}/checkout` y webhook firmado/idempotente `POST /payments/webhook`; columnas aditivas en `pago`/`cobro` + tabla `stripeevento` (migración `c7d8e9f0a1b2` aplicada); activación de suscripción y Bitácora; 5 tests nuevos (suite **209**); build y analyze OK. Falta configurar `STRIPE_WEBHOOK_SECRET` real en `.env`.
 - [x] Smoke test de endpoints con las credenciales demo (todos 200; `/reports/pdf` devuelve PDF; `/consumer/history` con `idcliente=1839`).
 - [x] Poblado historico de 6 meses (`2026-06`→`2026-11`) en la BD local: 2.894 filas, idempotente, serie de 6 puntos en `/reports/traceability` y suite en verde (188).
 - [ ] **Pendiente (sin acceso):** ejecutar `python seed_historical_36m.py` en Railway Shell con el `DATABASE_URL` de produccion (previamente `python seed.py` si la BD remota esta vacia). Los datos locales NO se suben con `git push`.
@@ -57,6 +71,7 @@ No quedan CUs pendientes del listado Sprint 4. Se agregó el **Panel Integral po
 * **Multi-tenant:** las tablas hijas (`pago`, `devolucionunidad`, `garantiaunidad`, `ventaunidad`, etc.) no tienen `idtenant`; filtrar siempre por join a `venta.idtenant` o `unidadproducto.idtenant`.
 * **Notarización de ventas:** es best-effort; un fallo de Blockchain no debe revertir la venta.
 * **ADR-006** queda parcialmente supersedido por **ADR-008**; no reintroducir planes/suscripciones en P1.
-* Si se crean nuevos tests, ejecutar `cd trazabilidad/backend && python -m pytest tests/ -q` y mantener **≥202 passed, 0 failed, 0 errors**.
-* Asistente (ADR-010, ADR-011): no alterar los campos nuevos de `VoiceReportResponse` (`period_label`, `interpretation`, `filters_applied`, `suggested_followups`, `product_detail`); son aditivos y los clientes móvil/web ya los consumen de forma opcional. El `top N` se acota a 50 y sin período se mantiene "todo el historico". La ficha detallada ignora el período de la consulta y usa siempre 36 meses; el producto se resuelve contra `CatalogoTenant` del tenant activo. `/ai/reports/{id}/export` exige JWT y valida empresa activa: el SuperAdmin debe cambiar de tenant antes de descargar un informe ajeno.
+* Si se crean nuevos tests, ejecutar `cd trazabilidad/backend && python -m pytest tests/ -q` y mantener **≥209 passed, 0 failed, 0 errors**.
+* Asistente (ADR-010, ADR-011, ADR-012): no alterar los campos nuevos de `VoiceReportResponse` (`period_label`, `interpretation`, `filters_applied`, `suggested_followups`, `product_detail`); son aditivos y los clientes móvil/web ya los consumen de forma opcional. El `top N` se acota a 50 y sin período se mantiene "todo el historico". La ficha detallada ignora el período de la consulta y usa siempre 36 meses; el producto se resuelve contra `CatalogoTenant` del tenant activo. `/ai/reports/{id}/export` exige JWT y valida empresa activa: el SuperAdmin debe cambiar de tenant antes de descargar un informe ajeno.
 * `/reports/analytics` es el único agregado nuevo: no modificar los contratos existentes de P7. El rango `meses` está limitado a `1..36`; los 36 puntos se rellenan con `0` en meses sin datos (nunca se omiten).
+* **Stripe (ADR-013):** no versionar llaves (`sk_test_...` y `whsec_...` sólo en `.env`); los endpoints de checkout son aditivos y los manuales quedan como fallback. El webhook **no lleva JWT**: confía en la firma y en el metadata `kind/tenant_id/id`, y vuelve a validar el padre por tenant. Un evento repetido es no-op por `stripeevento.eventoid`. Sin `STRIPE_WEBHOOK_SECRET` real, el webhook local devuelve 400/503. Para probar en local: `stripe listen --forward-to localhost:8000/api/v1/payments/webhook` y copiar el `whsec_` resultante. Pendiente para otra entrega: suscripciones recurrentes y QR de cobro (CU-041/CU-042); el QR de CU-016 es de trazabilidad.

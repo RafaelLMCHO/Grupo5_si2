@@ -208,6 +208,8 @@ export class LoginController implements OnInit {
       nit: val.nit.trim(),
       email: val.email_corporativo.trim().toLowerCase(),
       telefono: val.telefono.trim(),
+      password: val.password ? val.password.trim() : undefined,
+      idplan: val.idplan ? Number(val.idplan) : 1,
       activo: true
     };
 

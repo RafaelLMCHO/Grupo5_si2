@@ -17,7 +17,11 @@ from app.packages.p5_comercial.models.cu025_ventas.venta import Venta
 from app.packages.p5_comercial.models.cu027_pagos.pago import Pago, METODO_PAGO_ENUM, ESTADO_PAGO_ENUM
 from app.packages.p5_comercial.views.cu027_pagos.payment_views import (
     CreatePagoRequest, UpdatePagoEstadoRequest, PagoResponse, PagoListResponse,
+    CheckoutVentaRequest, CheckoutResponse, CheckoutStatusResponse, WebhookResponse,
 )
+from app.services.payments import stripe_gateway
+from app.services.payments.stripe_gateway import StripeGatewayError, StripeNotConfiguredError
+from app.services.payments.stripe_webhook import procesar_evento
 
 router = APIRouter(prefix="/payments", tags=["Pagos de Ventas (CU-027)"])
 
@@ -127,6 +131,117 @@ class PaymentController:
             venta.estado = "pagada"
 
     @staticmethod
+    def _saldo_pendiente(db: Session, venta: Venta) -> Decimal:
+        cobrado = db.execute(
+            select(func.coalesce(func.sum(Pago.monto), 0)).where(
+                Pago.idventa == venta.idventa, Pago.estado == "completado"
+            )
+        ).scalar() or Decimal("0")
+        return max(Decimal("0"), Decimal(str(venta.total)) - Decimal(str(cobrado)))
+
+    @staticmethod
+    def checkout_venta(db: Session, user: User, request: Request,
+                       body: CheckoutVentaRequest) -> CheckoutResponse:
+        """Crea un Checkout Session de Stripe y su Pago pendiente (CU-027)."""
+        tenant_id = resolve_tenant_id(db, user)
+        venta = db.execute(
+            select(Venta).where(Venta.idventa == body.idventa, Venta.idtenant == tenant_id)
+        ).scalar_one_or_none()
+        if not venta:
+            raise HTTPException(status_code=404, detail="La venta no existe en su empresa.")
+        if str(venta.estado) in ("cancelada", "devuelta"):
+            raise HTTPException(status_code=409, detail="No se puede cobrar una venta cancelada.")
+        saldo = PaymentController._saldo_pendiente(db, venta)
+        if saldo <= 0:
+            raise HTTPException(status_code=409, detail="La venta ya está cancelada.")
+
+        metadata = {
+            "kind": "venta", "tenant_id": tenant_id,
+            "id": venta.idventa, "ref": f"venta-{venta.idventa}",
+        }
+        try:
+            sesion = stripe_gateway.create_checkout_session(
+                monto=saldo, moneda="usd", descripcion=f"Venta #{venta.idventa}",
+                metadata=metadata,
+            )
+        except StripeNotConfiguredError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except StripeGatewayError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+        pago = Pago(
+            idventa=venta.idventa, metodopago="tarjeta_credito", monto=saldo,
+            fechapago=get_bolivia_now(), estado="pendiente", proveedor="stripe",
+            idtransaccion=sesion.get("id"), estadopasarela=sesion.get("estado"),
+        )
+        db.add(pago)
+        db.flush()
+        PaymentController._bitacora(
+            db, user, tenant_id, "CHECKOUT_STRIPE_VENTA", pago.idpago, get_client_ip(request)
+        )
+        db.commit()
+        db.refresh(pago)
+        return CheckoutResponse(
+            idpago=pago.idpago, idventa=venta.idventa,
+            checkout_id=str(sesion.get("id") or ""),
+            checkout_url=str(sesion.get("url") or ""),
+            estado=pago.estado, monto=pago.monto, expira_en=sesion.get("expira_en"),
+        )
+
+    @staticmethod
+    def estado_checkout(db: Session, user: User, idpago: int) -> CheckoutStatusResponse:
+        tenant_id = resolve_tenant_id(db, user)
+        pago = PaymentController._get_pago(db, tenant_id, idpago)
+        if pago.proveedor != "stripe" or not pago.idtransaccion:
+            raise HTTPException(status_code=400, detail="El pago no fue creado con Stripe.")
+        try:
+            sesion = stripe_gateway.retrieve_checkout_session(pago.idtransaccion)
+        except StripeNotConfiguredError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except StripeGatewayError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return CheckoutStatusResponse(
+            idpago=pago.idpago, estado=pago.estado, proveedor=pago.proveedor,
+            checkout_id=pago.idtransaccion, estado_pasarela=sesion.get("estado"),
+            pago_pasarela=sesion.get("payment_intent"), pago_confirmado=sesion.get("payment_status"),
+        )
+
+    @staticmethod
+    def reembolsar(db: Session, user: User, request: Request, idpago: int) -> PagoResponse:
+        tenant_id = resolve_tenant_id(db, user)
+        pago = PaymentController._get_pago(db, tenant_id, idpago)
+        if pago.proveedor != "stripe":
+            raise HTTPException(status_code=400, detail="El pago no fue creado con Stripe.")
+        if pago.estado != "completado":
+            raise HTTPException(status_code=409, detail="Sólo se pueden reembolsar pagos completados.")
+        try:
+            stripe_gateway.create_refund(
+                payment_intent_id=pago.paymentintentid,
+                metadata={
+                    "kind": "venta", "tenant_id": tenant_id,
+                    "pago_id": pago.idpago, "id": pago.idventa,
+                },
+            )
+        except StripeNotConfiguredError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except StripeGatewayError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        pago.estado = "reembolsado"
+        pago.estadopasarela = "refunded"
+        db.flush()
+        venta = db.execute(
+            select(Venta).where(Venta.idventa == pago.idventa)
+        ).scalars().first()
+        if venta:
+            PaymentController._sync_venta_estado(db, venta)
+        PaymentController._bitacora(
+            db, user, tenant_id, "REEMBOLSO_STRIPE_VENTA", pago.idpago, get_client_ip(request)
+        )
+        db.commit()
+        db.refresh(pago)
+        return PaymentController._to_response(db, pago)
+
+    @staticmethod
     def update_estado(db: Session, user: User, request: Request,
                       idpago: int, estado: str) -> PagoResponse:
         tenant_id = resolve_tenant_id(db, user)
@@ -189,3 +304,55 @@ def update_estado_route(
     current_user: User = Depends(requires_pagos),
 ):
     return PaymentController.update_estado(db, current_user, request, idpago, body.estado)
+
+
+# ── Stripe Checkout (ADR-013) ──────────────────────────────────────────────
+
+@router.post("/checkout", response_model=CheckoutResponse,
+             summary="Crear Checkout de Stripe para una venta")
+def crear_checkout_venta_route(
+    body: CheckoutVentaRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(requires_pagos),
+):
+    return PaymentController.checkout_venta(db, current_user, request, body)
+
+
+@router.get("/{idpago}/checkout", response_model=CheckoutStatusResponse,
+            summary="Consultar estado del Checkout de Stripe")
+def estado_checkout_venta_route(
+    idpago: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(requires_pagos),
+):
+    return PaymentController.estado_checkout(db, current_user, idpago)
+
+
+@router.post("/{idpago}/refund", response_model=PagoResponse,
+             summary="Reembolsar un pago de Stripe")
+def reembolsar_pago_route(
+    idpago: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(requires_pagos),
+):
+    return PaymentController.reembolsar(db, current_user, request, idpago)
+
+
+@router.post("/webhook", response_model=WebhookResponse,
+             summary="Webhook de Stripe (firma verificada, sin JWT)")
+async def stripe_webhook_route(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    payload = await request.body()
+    firma = request.headers.get("stripe-signature", "")
+    try:
+        evento = stripe_gateway.verify_webhook(payload, firma)
+    except StripeGatewayError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        return procesar_evento(db, evento)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

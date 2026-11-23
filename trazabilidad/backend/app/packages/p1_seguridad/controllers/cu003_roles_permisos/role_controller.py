@@ -12,6 +12,7 @@ from app.packages.p1_seguridad.models.cu003_roles_permisos.usuario_tenant_rol im
 from app.packages.p1_seguridad.models.cu001_tenants.tenant import Tenant
 from app.packages.p1_seguridad.models.cu002_usuarios.user import User
 from app.packages.p1_seguridad.controllers.cu004_autenticacion.auth_controller import get_current_user
+from app.controllers.shared import _es_superadmin, resolve_tenant_id, require_roles
 from app.packages.p1_seguridad.views.cu003_roles_permisos.role_views import (
     RoleResponse,
     PermissionResponse,
@@ -21,6 +22,9 @@ from app.packages.p1_seguridad.views.cu003_roles_permisos.role_views import (
 )
 
 router = APIRouter(tags=["Asignación de Roles y Permisos (CU-003)"])
+
+_requires_asignacion_roles = require_roles("SuperAdministrador", "AdministradorEmpresa")
+_requires_lectura_roles = require_roles("SuperAdministrador", "AdministradorEmpresa", "Auditor")
 
 
 class RoleController:
@@ -69,12 +73,22 @@ class RoleController:
                 detail=f"Usuario con ID {idusuario} no encontrado."
             )
 
+        es_super = _es_superadmin(db, current_user)
+        active_tenant_id = resolve_tenant_id(db, current_user)
+
         # 2. Obtener registro de usuariotenant en el contexto actual si existe
-        tenant_id = getattr(getattr(current_user, "tenant", None), "idtenant", None)
         stmt_ut = select(UsuarioTenant).where(UsuarioTenant.idusuario == idusuario)
         ut = None
-        if tenant_id:
-            ut = db.execute(stmt_ut.where(UsuarioTenant.idtenant == tenant_id)).scalars().first()
+        if active_tenant_id:
+            ut = db.execute(stmt_ut.where(UsuarioTenant.idtenant == active_tenant_id)).scalars().first()
+
+        # Si no es SuperAdministrador y no pertenece a la empresa activa, denegar acceso
+        if not es_super and not ut:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tiene permisos para consultar roles de un usuario que no pertenece a su empresa activa."
+            )
+
         if not ut:
             ut = db.execute(stmt_ut).scalars().first()
         if not ut:
@@ -115,12 +129,22 @@ class RoleController:
                 detail=f"Usuario con ID {idusuario} no encontrado."
             )
 
+        es_super = _es_superadmin(db, current_user)
+        active_tenant_id = resolve_tenant_id(db, current_user)
+
         # 2. Obtener registro de usuariotenant en el contexto actual
-        tenant_id = getattr(getattr(current_user, "tenant", None), "idtenant", None)
         stmt_ut = select(UsuarioTenant).where(UsuarioTenant.idusuario == idusuario)
         ut = None
-        if tenant_id:
-            ut = db.execute(stmt_ut.where(UsuarioTenant.idtenant == tenant_id)).scalars().first()
+        if active_tenant_id:
+            ut = db.execute(stmt_ut.where(UsuarioTenant.idtenant == active_tenant_id)).scalars().first()
+
+        # Si no es SuperAdministrador, NO puede modificar usuarios de otra empresa
+        if not es_super and not ut:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tiene permisos para modificar roles de un usuario que no pertenece a su empresa activa."
+            )
+
         if not ut:
             ut = db.execute(stmt_ut).scalars().first()
         if not ut:
@@ -131,14 +155,26 @@ class RoleController:
 
         # 3. Validar IDs de rol
         if data.role_ids:
-            stmt_valid = select(Role.idrol).where(Role.idrol.in_(data.role_ids))
-            valid_ids = db.execute(stmt_valid).scalars().all()
-            invalid_ids = set(data.role_ids) - set(valid_ids)
+            stmt_valid = select(Role).where(Role.idrol.in_(data.role_ids))
+            valid_roles = db.execute(stmt_valid).scalars().all()
+            valid_ids = {r.idrol for r in valid_roles}
+            invalid_ids = set(data.role_ids) - valid_ids
             if invalid_ids:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Los siguientes IDs de rol no existen: {list(invalid_ids)}"
                 )
+
+            # Un Administrador de Empresa NO puede asignar el rol SuperAdministrador
+            if not es_super:
+                super_role = db.execute(
+                    select(Role).where(Role.nombrerol == "SuperAdministrador")
+                ).scalars().first()
+                if super_role and super_role.idrol in data.role_ids:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Un Administrador de Empresa no tiene permisos para asignar el rol SuperAdministrador."
+                    )
 
         # 4. Eliminar roles previos del usuario en esta empresa
         db.execute(
@@ -202,7 +238,7 @@ class RoleController:
 @router.get("/roles", response_model=List[RoleResponse])
 def get_roles(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_requires_lectura_roles)
 ):
     """Listar todos los roles del sistema (CU-003)."""
     return RoleController.list_roles(db)
@@ -211,7 +247,7 @@ def get_roles(
 @router.get("/permissions", response_model=List[PermissionResponse])
 def get_permissions(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_requires_lectura_roles)
 ):
     """Listar todos los permisos del sistema (CU-003)."""
     return RoleController.list_permissions(db)
@@ -221,7 +257,7 @@ def get_permissions(
 def get_role_permissions(
     idrol: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_requires_lectura_roles)
 ):
     """Consultar permisos de un rol específico (CU-003)."""
     return RoleController.get_role_permissions(db, idrol)
@@ -231,7 +267,7 @@ def get_role_permissions(
 def get_user_roles(
     idusuario: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_requires_lectura_roles)
 ):
     """Consultar los roles asignados a un usuario (CU-003)."""
     return RoleController.get_user_roles(db, idusuario, current_user)
@@ -242,7 +278,7 @@ def assign_user_roles(
     idusuario: int,
     data: AssignUserRolesRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_requires_asignacion_roles)
 ):
     """Asignar/Reemplazar roles a un usuario (CU-003)."""
     return RoleController.assign_user_roles(db, idusuario, data, current_user)

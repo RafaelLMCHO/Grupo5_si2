@@ -1,5 +1,5 @@
 """CU-039 - Gestionar facturación e historial de cobros (P8)."""
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
@@ -16,8 +16,10 @@ from app.packages.p8_suscripciones.models.cu036_planes.subscription_models impor
 from app.packages.p8_suscripciones.models.cu039_facturacion.factura import Cobro, Factura, FacturaDetalle
 from app.packages.p8_suscripciones.views.cu039_facturacion.billing_views import (
     CrearFacturaRequest, FacturaListResponse, FacturaResponse,
-    HistorialFacturacionResponse, RegistrarCobroRequest,
+    HistorialFacturacionResponse, RegistrarCobroRequest, InvoiceCheckoutResponse,
 )
+from app.services.payments import stripe_gateway
+from app.services.payments.stripe_gateway import StripeGatewayError, StripeNotConfiguredError
 
 router = APIRouter(prefix="/invoices", tags=["Facturación e Historial (CU-039)"])
 history_router = APIRouter(prefix="/billing", tags=["Historial de Facturación (CU-039)"])
@@ -175,6 +177,90 @@ class BillingController:
         return BillingController._to_response(db, factura)
 
     @staticmethod
+    def checkout_factura(db: Session, user: User, idfactura: int) -> InvoiceCheckoutResponse:
+        """Checkout de Stripe para el saldo de una factura SaaS (CU-039)."""
+        tenant_id = resolve_tenant_id(db, user)
+        factura = BillingController._get_factura(db, tenant_id, idfactura)
+        saldo = BillingController._saldo(db, factura)
+        if saldo <= 0:
+            raise HTTPException(status_code=409, detail="La factura ya está cancelada.")
+
+        metadata = {
+            "kind": "factura", "tenant_id": tenant_id,
+            "id": factura.idfactura, "ref": f"factura-{factura.idfactura}",
+        }
+        try:
+            sesion = stripe_gateway.create_checkout_session(
+                monto=saldo,
+                moneda=factura.moneda or "USD",
+                descripcion=f"Factura {factura.numero}",
+                metadata=metadata,
+            )
+        except StripeNotConfiguredError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except StripeGatewayError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+        cobro = Cobro(
+            idfactura=factura.idfactura,
+            fechacobro=get_bolivia_now(),
+            monto=saldo,
+            metodopago="stripe",
+            referencia=str(sesion.get("id") or ""),
+            estado="pendiente",
+            proveedor="stripe",
+            idtransaccion=sesion.get("id"),
+            estadopasarela=sesion.get("estado"),
+        )
+        db.add(cobro)
+        db.flush()
+        db.commit()
+        db.refresh(cobro)
+        return InvoiceCheckoutResponse(
+            idcobro=cobro.idcobro, idfactura=factura.idfactura,
+            checkout_id=str(sesion.get("id") or ""),
+            checkout_url=str(sesion.get("url") or ""),
+            estado=cobro.estado, monto=cobro.monto, expira_en=sesion.get("expira_en"),
+        )
+
+    @staticmethod
+    def confirmar_cobro_stripe(
+        db: Session, cobro: Cobro, payment_intent: Optional[str] = None
+    ) -> FacturaResponse:
+        """Confirma un cobro desde el webhook y activa la suscripción asociada."""
+        cobro.estado = "completado"
+        cobro.estadopasarela = "complete"
+        if payment_intent:
+            cobro.paymentintentid = payment_intent
+        db.flush()  # autoflush=False: _saldo() debe ver el cobro completado
+        factura = db.execute(
+            select(Factura).where(Factura.idfactura == cobro.idfactura)
+        ).scalars().first()
+        if factura is None:
+            raise ValueError("El cobro de Stripe no tiene factura asociada.")
+
+        if BillingController._saldo(db, factura) <= 0:
+            factura.estado = "pagada"
+            if factura.idsuscripcion:
+                sus = db.execute(
+                    select(Suscripcion).where(
+                        Suscripcion.idsuscripcion == factura.idsuscripcion,
+                        Suscripcion.idtenant == factura.idtenant,
+                    )
+                ).scalars().first()
+                if sus:
+                    ahora = get_bolivia_now()
+                    sus.estado = "activa"
+                    sus.actualizadoen = ahora
+                    fin = sus.fechafin.replace(tzinfo=None) if sus.fechafin.tzinfo else sus.fechafin
+                    if fin < ahora:
+                        sus.fechafin = ahora + timedelta(days=30)
+                    sus.fechainicio = sus.fechainicio or ahora
+        billing_notifier.notificar_cobro(db, factura, cobro.monto)
+        db.flush()
+        return BillingController._to_response(db, factura)
+
+    @staticmethod
     def historial(db: Session, user: User) -> HistorialFacturacionResponse:
         tenant_id = resolve_tenant_id(db, user)
         facturas = db.execute(
@@ -240,6 +326,16 @@ def registrar_cobro(
     current_user: User = Depends(requires_facturacion),
 ):
     return BillingController.registrar_cobro(db, current_user, idfactura, body)
+
+
+@router.post("/{idfactura}/checkout", response_model=InvoiceCheckoutResponse,
+             summary="Crear Checkout de Stripe para una factura")
+def checkout_factura(
+    idfactura: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(requires_facturacion),
+):
+    return BillingController.checkout_factura(db, current_user, idfactura)
 
 
 @history_router.get("/history", response_model=HistorialFacturacionResponse)

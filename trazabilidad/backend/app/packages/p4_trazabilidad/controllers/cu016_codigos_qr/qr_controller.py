@@ -16,7 +16,7 @@ from app.models.cu006_productos_variantes.product import Producto
 from app.models.cu005_bitacora.bitacora import Bitacora
 from app.models.cu002_usuarios.user import User
 from app.models.cu002_usuarios.usuario_tenant import UsuarioTenant
-from app.controllers.shared import get_user_tenant_id, require_roles
+from app.controllers.shared import resolve_tenant_id, require_roles
 from app.controllers.cu004_autenticacion.auth_controller import get_current_user
 from app.views.cu016_codigos_qr.qr_views import (
     UnitQrInfoResponse,
@@ -46,7 +46,7 @@ def _get_client_ip(request: Request) -> str:
 
 def _get_tenant_id(db: Session, user: User) -> int:
     try:
-        return get_user_tenant_id(db, user)
+        return resolve_tenant_id(db, user)
     except Exception:
         tenant = getattr(user, "tenant", None)
         return getattr(tenant, "idtenant", 1) if tenant else 1

@@ -41,6 +41,7 @@ from app.packages.p5_comercial.models.cu025_ventas.venta import (
 )
 from app.packages.p5_comercial.models.cu026_asignacion_unidades_venta.venta_unidad import VentaUnidad
 from app.packages.p5_comercial.models.cu027_pagos.pago import Pago, METODO_PAGO_ENUM, ESTADO_PAGO_ENUM
+from app.packages.p5_comercial.models.cu027_pagos.stripe_event import StripeEvent
 from app.packages.p5_comercial.models.cu029_devoluciones.devolucion import (
     Devolucion, MOTIVO_DEVOLUCION_ENUM, ESTADO_DEVOLUCION_ENUM,
 )
@@ -95,6 +96,7 @@ __all__ = [
     "ESTADO_VENTA_ENUM",
     "VentaUnidad",
     "Pago",
+    "StripeEvent",
     "METODO_PAGO_ENUM",
     "ESTADO_PAGO_ENUM",
     "Devolucion",

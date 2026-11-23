@@ -7,7 +7,7 @@ from app.db.session import get_db
 from app.models.cu013_actores_cadena.actor import ActorCadena
 from app.models.cu002_usuarios.user import User
 from app.controllers.cu004_autenticacion.auth_controller import get_current_user
-from app.controllers.shared import get_user_tenant_id, require_roles
+from app.controllers.shared import resolve_tenant_id, require_roles
 from app.views.cu013_actores_cadena.actor_views import (
     ActorCreate,
     ActorUpdate,
@@ -33,7 +33,7 @@ class ActorController:
         skip: int = 0,
         limit: int = 50
     ) -> ActorListResponse:
-        tenant_id = get_user_tenant_id(db, user)
+        tenant_id = resolve_tenant_id(db, user)
         query = select(ActorCadena).where(ActorCadena.idtenant == tenant_id)
 
         if tipoactor and tipoactor.strip():
@@ -63,7 +63,7 @@ class ActorController:
 
     @staticmethod
     def create_actor(db: Session, user: User, data: ActorCreate) -> ActorResponse:
-        tenant_id = get_user_tenant_id(db, user)
+        tenant_id = resolve_tenant_id(db, user)
         actor = ActorCadena(
             idtenant=tenant_id,
             nombre=data.nombre,
@@ -80,7 +80,7 @@ class ActorController:
 
     @staticmethod
     def update_actor(db: Session, user: User, idactor: int, data: ActorUpdate) -> ActorResponse:
-        tenant_id = get_user_tenant_id(db, user)
+        tenant_id = resolve_tenant_id(db, user)
         stmt = select(ActorCadena).where(
             ActorCadena.idactor == idactor,
             ActorCadena.idtenant == tenant_id
@@ -108,7 +108,7 @@ class ActorController:
 
     @staticmethod
     def delete_actor(db: Session, user: User, idactor: int):
-        tenant_id = get_user_tenant_id(db, user)
+        tenant_id = resolve_tenant_id(db, user)
         stmt = select(ActorCadena).where(
             ActorCadena.idactor == idactor,
             ActorCadena.idtenant == tenant_id

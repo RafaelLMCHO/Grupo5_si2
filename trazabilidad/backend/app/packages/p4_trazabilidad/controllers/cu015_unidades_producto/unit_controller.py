@@ -11,7 +11,7 @@ from app.models.cu013_actores_cadena.actor import ActorCadena
 from app.models.cu014_ubicaciones.location import Ubicacion
 from app.models.cu002_usuarios.user import User
 from app.controllers.cu004_autenticacion.auth_controller import get_current_user
-from app.controllers.shared import get_user_tenant_id, require_roles
+from app.controllers.shared import resolve_tenant_id, require_roles
 from app.views.cu015_unidades_producto.unit_views import (
     UnitCreate,
     UnitUpdate,
@@ -44,7 +44,7 @@ class UnitController:
         skip: int = 0,
         limit: int = 50
     ) -> UnitListResponse:
-        tenant_id = get_user_tenant_id(db, user)
+        tenant_id = resolve_tenant_id(db, user)
         query = select(UnidadProducto).where(UnidadProducto.idtenant == tenant_id)
 
         if estado and estado.strip():
@@ -78,14 +78,56 @@ class UnitController:
 
     @staticmethod
     def create_unit(db: Session, user: User, data: UnitCreate) -> UnitResponse:
-        tenant_id = get_user_tenant_id(db, user)
+        tenant_id = resolve_tenant_id(db, user)
 
-        # Validar que la variante exista
+        # 1. Validar que la variante exista
         stmt_v = select(VarianteProducto).where(VarianteProducto.idvariante == data.idvariante)
         if not db.execute(stmt_v).scalar_one_or_none():
             raise HTTPException(status_code=404, detail=f"Variante {data.idvariante} no encontrada.")
 
-        # Validar número de serie duplicado
+        # 2. Validar que la variante pertenezca a la empresa (si está en catálogo de otra empresa)
+        from app.models.cu008_catalogo_empresa.tenant_catalog import CatalogoTenant
+        stmt_ct_mine = select(CatalogoTenant).where(
+            CatalogoTenant.idtenant == tenant_id,
+            CatalogoTenant.idvariante == data.idvariante
+        )
+        has_mine = db.execute(stmt_ct_mine).scalar_one_or_none()
+        if not has_mine:
+            stmt_ct_other = select(CatalogoTenant).where(
+                CatalogoTenant.idtenant != tenant_id,
+                CatalogoTenant.idvariante == data.idvariante
+            )
+            if db.execute(stmt_ct_other).scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"La variante {data.idvariante} pertenece al catálogo de otra empresa."
+                )
+
+        # 3. Validar pertenencia del custodio
+        if data.idcustodioactual:
+            stmt_a = select(ActorCadena).where(
+                ActorCadena.idactor == data.idcustodioactual,
+                ActorCadena.idtenant == tenant_id
+            )
+            if not db.execute(stmt_a).scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"El actor {data.idcustodioactual} no pertenece a la misma empresa de la unidad."
+                )
+
+        # 4. Validar pertenencia de la ubicación
+        if data.idubicacionactual:
+            stmt_u = select(Ubicacion).where(
+                Ubicacion.idubicacion == data.idubicacionactual,
+                Ubicacion.idtenant == tenant_id
+            )
+            if not db.execute(stmt_u).scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"La ubicación {data.idubicacionactual} no pertenece a la misma empresa de la unidad."
+                )
+
+        # 5. Validar número de serie duplicado
         stmt_s = select(UnidadProducto).where(
             UnidadProducto.idtenant == tenant_id,
             UnidadProducto.numeroserie == data.numeroserie
@@ -113,7 +155,7 @@ class UnitController:
 
     @staticmethod
     def update_unit(db: Session, user: User, idunidad: int, data: UnitUpdate) -> UnitResponse:
-        tenant_id = get_user_tenant_id(db, user)
+        tenant_id = resolve_tenant_id(db, user)
         stmt = select(UnidadProducto).where(
             UnidadProducto.idunidad == idunidad,
             UnidadProducto.idtenant == tenant_id
@@ -121,6 +163,32 @@ class UnitController:
         unit = db.execute(stmt).scalar_one_or_none()
         if not unit:
             raise HTTPException(status_code=404, detail=f"Unidad {idunidad} no encontrada.")
+
+        # Validar pertenencia del custodio si se actualiza
+        if data.idcustodioactual is not None:
+            stmt_a = select(ActorCadena).where(
+                ActorCadena.idactor == data.idcustodioactual,
+                ActorCadena.idtenant == tenant_id
+            )
+            if not db.execute(stmt_a).scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"El actor {data.idcustodioactual} no pertenece a la misma empresa de la unidad."
+                )
+            unit.idcustodioactual = data.idcustodioactual
+
+        # Validar pertenencia de la ubicación si se actualiza
+        if data.idubicacionactual is not None:
+            stmt_u = select(Ubicacion).where(
+                Ubicacion.idubicacion == data.idubicacionactual,
+                Ubicacion.idtenant == tenant_id
+            )
+            if not db.execute(stmt_u).scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"La ubicación {data.idubicacionactual} no pertenece a la misma empresa de la unidad."
+                )
+            unit.idubicacionactual = data.idubicacionactual
 
         if data.numeroserie is not None:
             unit.numeroserie = data.numeroserie
@@ -130,10 +198,6 @@ class UnitController:
             unit.imei2 = data.imei2
         if data.eid is not None:
             unit.eid = data.eid
-        if data.idcustodioactual is not None:
-            unit.idcustodioactual = data.idcustodioactual
-        if data.idubicacionactual is not None:
-            unit.idubicacionactual = data.idubicacionactual
         if data.estado is not None:
             unit.estado = data.estado
 
@@ -143,7 +207,7 @@ class UnitController:
 
     @staticmethod
     def delete_unit(db: Session, user: User, idunidad: int):
-        tenant_id = get_user_tenant_id(db, user)
+        tenant_id = resolve_tenant_id(db, user)
         stmt = select(UnidadProducto).where(
             UnidadProducto.idunidad == idunidad,
             UnidadProducto.idtenant == tenant_id

@@ -168,7 +168,7 @@
         style="background: #1e293b; color: #38bdf8; border: 1px solid #0284c7; padding: 0.35rem 0.6rem; border-radius: 6px; font-weight: 600; font-size: 0.8rem; cursor: pointer; max-width: 220px;"
         title="Cambiar contexto de empresa activa">
         @for (t of tenants(); track t.idtenant) {
-        <option [value]="t.idtenant">
+        <option [value]="t.idtenant" [selected]="t.idtenant === currentUser()?.tenant?.idtenant">
           🏢 {{ t.nombre }} (NIT: {{ t.nit }})
         </option>
         }

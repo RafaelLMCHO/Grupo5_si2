@@ -124,7 +124,7 @@ El desarrollo del sistema de trazabilidad blockchain se ejecuta de forma iterati
 ---
 
 ### Sprint 4: Ventas, Consumidor, Devoluciones y Reportes (57 horas)
-*Estado: Planificado.*
+*Estado: Completado en backend/web/móvil; extensión de pago único con Stripe añadida (ADR-013).*
 
 | ID | Rol | Tarea / Funcionalidad | Plataforma | Horas | Paquete |
 | :--- | :--- | :--- | :--- | :---: | :---: |
@@ -141,6 +141,7 @@ El desarrollo del sistema de trazabilidad blockchain se ejecuta de forma iterati
 | **T060** | Dev Team (Backend) | Generación de certificados digitales PDF con hash blockchain | Backend | 5 | P6 / P7 |
 | **T061** | Dev Team (Frontend) | Dashboard administrativo y visualización de reportes (KPIs) | Web | 5 | P7 |
 | **T062** | Dev Team (Fullstack) | Panel Integral por tenant: `/reports/analytics` (36 meses), panel web/móvil de 8 pestañas y seed 36m (ADR-009) | Backend/Web/Móvil | 8 | P7 |
+| **T063** | Dev Team (Backend) | Stripe Checkout de pago único para ventas y facturas: webhook firmado/idempotente, reembolso, activación de suscripción y migración aditiva (CU-027/CU-039, ADR-013) | Backend | 8 | P5 / P8 |
 
 ---
 
@@ -154,7 +155,7 @@ flowchart TD
     Step3 --> Step4["Verificar Aislamiento Multi-Tenant (idtenant)"]
     Step4 --> Step5["Escribir Test Automatizado en tests/"]
     Step5 --> Step6["Ejecutar Pytest contra DB blacktest"]
-    Step6 --> Decision{"¿100% Verde (≥167 tests)?"}
+    Step6 --> Decision{"¿100% Verde (≥209 tests)?"}
     Decision -- No --> Fix["Depurar sin alterar contratos ajenos"] --> Step6
     Decision -- Sí --> Done["Tarea Finalizada (DoD Cumplida)"]
 ```

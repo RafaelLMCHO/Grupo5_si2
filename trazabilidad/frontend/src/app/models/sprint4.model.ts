@@ -67,6 +67,30 @@ export interface Pago {
   venta_estado: string;
 }
 
+export interface CheckoutVentaRequest {
+  idventa: number;
+}
+
+export interface CheckoutResponse {
+  idpago: number;
+  idventa: number;
+  checkout_id: string;
+  checkout_url: string;
+  estado: string;
+  monto: string;
+  expira_en?: number;
+}
+
+export interface CheckoutStatusResponse {
+  idpago: number;
+  estado: string;
+  proveedor: string;
+  checkout_id: string;
+  estado_pasarela?: string;
+  pago_pasarela?: string;
+  pago_confirmado?: string;
+}
+
 export interface PagoListResponse {
   total: number;
   items: Pago[];

@@ -31,6 +31,8 @@ import { AfterSalesManagementController } from './controllers/pages/after-sales-
 import { ReportingController } from './controllers/pages/reporting.controller';
 import { QuotasManagementController } from './controllers/pages/quotas-management.controller';
 import { BillingManagementController } from './controllers/pages/billing-management.controller';
+import { PaymentSuccessController } from './controllers/pages/payment-success.controller';
+import { PaymentCancelController } from './controllers/pages/payment-cancel.controller';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 
@@ -40,7 +42,7 @@ export const routes: Routes = [
   { path: 'forgot-password', component: ForgotPasswordController },
   { path: 'reset-password', component: ResetPasswordController },
   { path: 'dashboard', component: DashboardController, canActivate: [authGuard] },
-  { path: 'tenants', component: TenantManagementController, canActivate: [authGuard, roleGuard(['SuperAdministrador', 'AdministradorEmpresa'])] },
+  { path: 'tenants', component: TenantManagementController, canActivate: [authGuard, roleGuard(['SuperAdministrador'])] },
   { path: 'users', component: UserManagementController, canActivate: [authGuard, roleGuard(['SuperAdministrador', 'AdministradorEmpresa'])] },
   { path: 'roles', component: RoleManagementController, canActivate: [authGuard, roleGuard(['SuperAdministrador', 'AdministradorEmpresa'])] },
   { path: 'bitacora', component: AuditNotificationController, canActivate: [authGuard, roleGuard(['SuperAdministrador', 'AdministradorEmpresa', 'Auditor'])] },
@@ -68,5 +70,7 @@ export const routes: Routes = [
   { path: 'reports', component: ReportingController, canActivate: [authGuard, roleGuard(['SuperAdministrador', 'AdministradorEmpresa', 'GestorOperaciones', 'GestorVentasPostventa', 'Auditor'])] },
   { path: 'quotas', component: QuotasManagementController, canActivate: [authGuard, roleGuard(['SuperAdministrador', 'AdministradorEmpresa', 'GestorOperaciones', 'GestorVentasPostventa', 'Auditor'])] },
   { path: 'billing', component: BillingManagementController, canActivate: [authGuard, roleGuard(['SuperAdministrador', 'AdministradorEmpresa'])] },
+  { path: 'pagos/exitoso', component: PaymentSuccessController, canActivate: [authGuard] },
+  { path: 'pagos/cancelado', component: PaymentCancelController, canActivate: [authGuard] },
   { path: '**', redirectTo: 'login' }
 ];

@@ -54,5 +54,10 @@ class Cobro(Base):
     metodopago: Mapped[str] = mapped_column(String(40), nullable=False)
     referencia: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     estado: Mapped[str] = mapped_column(String(20), default="completado", nullable=False)
+    # Campos aditivos de pasarela (ADR-013).
+    proveedor: Mapped[str] = mapped_column(String(20), default="manual", nullable=False)
+    idtransaccion: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    paymentintentid: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    estadopasarela: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
 
     factura = relationship("Factura", back_populates="cobros")

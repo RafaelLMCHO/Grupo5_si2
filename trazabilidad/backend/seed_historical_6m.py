@@ -5,6 +5,9 @@ Diseno:
   * Claves naturales deterministas por (tenant, periodo) -> re-ejecutar es no-op.
   * Un ``manifest`` con los IDs insertados permite ``--reset-history`` sin
     tocar datos operacionales del seed canonico.
+  * Un bloque suplementario ``HSALE`` da senal comercial a hasta 10
+    productos activos distintos por tenant (claves propias, no colisionan
+    con ``HIST``) para que el ``top 10`` por periodo se llene siempre.
   * ``--dry-run`` ejecuta toda la logica (incluye flush para resolver FKs)
     pero hace rollback al final: no escribe nada en la BD.
 
@@ -37,6 +40,8 @@ from app.models.cu002_usuarios.usuario_tenant import UsuarioTenant
 from app.models.cu005_bitacora.bitacora import Bitacora
 from app.models.cu005_bitacora.notification import Notificacion
 # P2
+from app.models.cu006_productos_variantes.product import Producto
+from app.models.cu006_productos_variantes.variant import VarianteProducto
 from app.packages.p2_catalogo.models.cu008_catalogo_empresa.tenant_catalog import CatalogoTenant
 from app.packages.p2_catalogo.models.cu010_ordenes_compra.purchase import Compra, CompraDetalle
 from app.packages.p2_catalogo.models.cu012_recepciones.reception import RecepcionCompra, RecepcionDetalle
@@ -72,6 +77,10 @@ from app.packages.p8_suscripciones.models.cu039_facturacion.factura import Cobro
 
 MANIFEST = Path(__file__).with_name("seed_historical_6m.manifest.json")
 PREFIJO = "HIST"
+# Bloque suplementario de señal comercial. Claves propias para no colisionar
+# con el historial HIST ya sembrado (las claves naturales son inmutables).
+PREFIJO_EXTRA = "HSALE"
+PRODUCTOS_EXTRA_POR_TENANT = 10
 MESES = 6
 UNIDADES_POR_MES = 12
 VENTAS_POR_MES = 4
@@ -783,6 +792,410 @@ def poblar_tenant(db: Any, cargador: Cargador, tenant: Tenant, ahora: datetime) 
                 estado="completado",
             ),
         )
+
+    poblar_senal_comercial_top10(
+        db, cargador, tenant, ahora, variantes,
+        ubicacion, tiendas, proveedores, transportistas, idusuario,
+    )
+
+
+def seleccionar_variantes_top10(
+    db: Any,
+    idtenant: int,
+    variantes_base: List[int],
+    limite: int = PRODUCTOS_EXTRA_POR_TENANT,
+) -> List[Tuple[int, int, Decimal]]:
+    """Devuelve una variante activa por producto distinto del tenant.
+
+    Se excluyen los productos ya sembrados por el bloque HIST (las tres
+    primeras variantes), de modo que el bloque suplementario añade señal
+    comercial a productos nuevos y el ``top 10`` del asistente se llene
+    aunque el catálogo del tenant tenga exactamente 10 productos.
+    """
+    ids_base: set = set()
+    if variantes_base:
+        ids_base = set(
+            db.execute(
+                select(VarianteProducto.idproducto).where(
+                    VarianteProducto.idvariante.in_(variantes_base)
+                )
+            ).scalars().all()
+        )
+
+    filas = db.execute(
+        select(
+            VarianteProducto.idvariante,
+            VarianteProducto.idproducto,
+            CatalogoTenant.precioventa,
+        )
+        .join(CatalogoTenant, CatalogoTenant.idvariante == VarianteProducto.idvariante)
+        .join(Producto, Producto.idproducto == VarianteProducto.idproducto)
+        .where(
+            CatalogoTenant.idtenant == idtenant,
+            CatalogoTenant.activo.is_(True),
+            # Los productos genericos del seed canonico no tienen ficha
+            # recognizable; se priorizan los nombres reales del catalogo.
+            Producto.nombre.notilike("Producto Tenant %"),
+        )
+        .order_by(Producto.nombre, VarianteProducto.idvariante)
+    ).all()
+
+    elegidas: List[Tuple[int, int, Decimal]] = []
+    vistos = set(ids_base)
+    for idvariante, idproducto, precio in filas:
+        if idproducto in vistos:
+            continue
+        vistos.add(idproducto)
+        precio_final = Decimal(str(precio)) if precio else Decimal("1200.00")
+        elegidas.append((idvariante, idproducto, precio_final))
+        if len(elegidas) >= limite:
+            break
+    return elegidas
+
+
+def poblar_senal_comercial_top10(
+    db: Any,
+    cargador: Cargador,
+    tenant: Tenant,
+    ahora: datetime,
+    variantes_base: List[int],
+    ubicacion: Ubicacion,
+    tiendas: List[ActorCadena],
+    proveedores: List[ActorCadena],
+    transportistas: List[ActorCadena],
+    idusuario: int,
+) -> None:
+    """Señal comercial suplementaria con claves ``HSALE`` (idempotente).
+
+    El bloque HIST original sólo vendía sobre 3 variantes, por lo que un
+    ``top 10`` por período devolvía 6 filas. Aquí se generan ventas físicas
+    y registradas para hasta 10 productos adicionales por tenant en cada
+    mes del rango, con QR, eventos anclados, alertas, garantías e
+    incidentes para que la ficha de cualquiera de ellos tenga métricas
+    reales y no aparezcan ceros.
+    """
+    tt = tenant.idtenant
+    elegidas = seleccionar_variantes_top10(db, tt, variantes_base)
+    if not elegidas:
+        print(f"  [OMITIR] tenant {tt}: sin productos adicionales para el top 10")
+        return
+
+    # Un cliente por producto: ``Venta`` no tiene numero propio y su clave
+    # natural es (idcliente, fechaventa). Así cada línea tiene su propia
+    # cabecera y el ``total`` coincide con su detalle.
+    consumidores_extra = [
+        cargador.add(
+            ActorCadena,
+            {"idtenant": tt, "nombre": f"CONSUMIDOR TOP10 {tenant.nombre} P{idx:02d}"},
+            lambda i=idx: ActorCadena(
+                idtenant=tt,
+                nombre=f"CONSUMIDOR TOP10 {tenant.nombre} P{i:02d}",
+                nit=f"{PREFIJO_EXTRA}-{tt}-{i:02d}",
+                email=f"top10{tt}p{i:02d}@demo.local",
+                tipoactor="CONSUMIDOR",
+            ),
+        )
+        for idx in range(len(elegidas))
+    ]
+
+    for desplazamiento in range(-(MESES - 1), 1):
+        anio, mes = anio_mes(ahora, desplazamiento)
+        periodo = f"{anio:04d}-{mes:02d}"
+
+        for idx, (idvariante, _idproducto, precio) in enumerate(elegidas):
+            clave = f"{PREFIJO_EXTRA}-{tt:02d}-{periodo.replace('-', '')}-P{idx:02d}"
+            serie = f"{clave}-V"
+            uuid_publico = sha("uuid", serie)
+            token = f"{PREFIJO_EXTRA.lower()}-{tt}-{periodo}-{idx:02d}"
+            fecha_ingreso = dia_en_mes(
+                anio, mes, semilla(tt, periodo, PREFIJO_EXTRA, idx, "ing"), max_dia=12
+            )
+            fecha_venta = dia_en_mes(
+                anio, mes, semilla(tt, periodo, PREFIJO_EXTRA, idx, "ven"), min_dia=13
+            )
+            fecha_pago = fecha_venta + timedelta(
+                days=1 + semilla(tt, periodo, PREFIJO_EXTRA, idx, "pgo") % 3
+            )
+            fecha_evento = dia_en_mes(
+                anio, mes, semilla(tt, periodo, PREFIJO_EXTRA, idx, "evt"), min_dia=8
+            )
+            fecha_alerta = dia_en_mes(
+                anio, mes, semilla(tt, periodo, PREFIJO_EXTRA, idx, "ala"), min_dia=10
+            )
+            total_precio = precio.quantize(Decimal("0.01"))
+
+            # --- Unidad vendida (inventario) y, a veces, stock disponible ---
+            unidad = cargador.add(
+                UnidadProducto,
+                {"numeroserie": serie},
+                lambda s=serie, v=idvariante, u=uuid_publico, fi=fecha_ingreso, fv=fecha_venta: UnidadProducto(
+                    idtenant=tt, idvariante=v, numeroserie=s,
+                    imei1=str(semilla("imei", s))[:15], uuidpublico=u,
+                    idcustodioactual=tiendas[0].idactor,
+                    idubicacionactual=ubicacion.idubicacion,
+                    estado="vendido", fechaingreso=fi, fechaventa=fv,
+                ),
+            )
+            if mes % 3 == 0:
+                serie_disponible = f"{clave}-D"
+                cargador.add(
+                    UnidadProducto,
+                    {"numeroserie": serie_disponible},
+                    lambda s=serie_disponible, v=idvariante: UnidadProducto(
+                        idtenant=tt, idvariante=v, numeroserie=s,
+                        imei1=str(semilla("imei", s))[:15], uuidpublico=sha("uuid", s),
+                        idcustodioactual=tiendas[0].idactor,
+                        idubicacionactual=ubicacion.idubicacion,
+                        estado="disponible", fechaingreso=fecha_ingreso,
+                    ),
+                )
+
+            # --- QR y consulta pública ------------------------------------
+            qr = cargador.add(
+                CodigoQR,
+                {"tokenpublico": token},
+                lambda tkn=token, fi=fecha_ingreso, u=unidad: CodigoQR(
+                    idunidad=u.idunidad, tokenpublico=tkn,
+                    url=f"https://blockchain-production-8de2.up.railway.app/trace/{u.uuidpublico}",
+                    fechageneracion=fi, activo=True,
+                ),
+            )
+            fecha_consulta = fecha_ingreso + timedelta(days=2)
+            cargador.add(
+                ConsultaTrazabilidad,
+                {"idcodigoqr": qr.idcodigoqr, "fechahora": fecha_consulta},
+                lambda c=qr, f=fecha_consulta: ConsultaTrazabilidad(
+                    idcodigoqr=c.idcodigoqr, fechahora=f,
+                    ip="190.2.11.11", paisaproximado="BO",
+                    useragent="DemoApp/1.0 (top10 historico)",
+                ),
+            )
+
+            # --- Venta registrada, detalle, asignación y pago --------------
+            consumidor = consumidores_extra[idx]
+            venta = cargador.add(
+                Venta,
+                {"idcliente": consumidor.idactor, "fechaventa": fecha_venta},
+                lambda f=fecha_venta, t=total_precio, c=consumidor: Venta(
+                    idtenant=tt, idcliente=c.idactor, fechaventa=f,
+                    total=t, estado="entregada",
+                ),
+            )
+            detalle = cargador.add(
+                VentaDetalle,
+                {"idventa": venta.idventa, "idvariante": idvariante},
+                lambda v=venta, iv=idvariante, t=total_precio: VentaDetalle(
+                    idventa=v.idventa, idvariante=iv,
+                    cantidad=1, preciounitario=t, subtotal=t,
+                ),
+            )
+            cargador.add(
+                VentaUnidad,
+                {"idunidad": unidad.idunidad},
+                lambda d=detalle, u=unidad: VentaUnidad(
+                    idventadetalle=d.idventadetalle, idunidad=u.idunidad
+                ),
+            )
+            cargador.add(
+                Pago,
+                {"idventa": venta.idventa, "fechapago": fecha_pago},
+                lambda v=venta, t=total_precio, f=fecha_pago, i=idx: Pago(
+                    idventa=v.idventa, metodopago=METODOS_PAGO[i % len(METODOS_PAGO)],
+                    monto=t, fechapago=f, estado="completado",
+                ),
+            )
+
+            # --- Evento de venta, condición y anclaje blockchain -----------
+            descripcion_evento = f"{PREFIJO_EXTRA} venta tenant {tt} {periodo} p{idx:02d}"
+            evento = cargador.add(
+                EventoTrazabilidad,
+                {"descripcion": descripcion_evento},
+                lambda d=descripcion_evento, f=fecha_evento, iv=idusuario: EventoTrazabilidad(
+                    idtenant=tt, tipoevento="venta", fechahora=f,
+                    idactororigen=proveedores[0].idactor,
+                    idactordestino=tiendas[0].idactor,
+                    idubicacion=ubicacion.idubicacion,
+                    idusuarioresponsable=iv, descripcion=d,
+                    payloadhash=sha("evento", d)[:64],
+                    estadoverificacion="verificado",
+                ),
+            )
+            cargador.add(
+                EventoUnidad,
+                {"idevento": evento.idevento, "idunidad": unidad.idunidad},
+                lambda e=evento, u=unidad: EventoUnidad(
+                    idevento=e.idevento, idunidad=u.idunidad
+                ),
+            )
+            cargador.add(
+                CondicionTransporte,
+                {"idevento": evento.idevento},
+                lambda e=evento, f=fecha_evento: CondicionTransporte(
+                    idevento=e.idevento, temperatura=Decimal("19.20"),
+                    humedad=Decimal("53.00"), presion=Decimal("1012.80"),
+                    nivelvibracion=Decimal("0.25"), timestampregistro=f,
+                    fuentedatos=f"SENSOR-{PREFIJO_EXTRA}",
+                ),
+            )
+            payload = sha("blockchain", PREFIJO_EXTRA, tt, periodo, idx)
+            cargador.add(
+                RegistroBlockchain,
+                {"payloadhash": payload},
+                lambda e=evento, p=payload, f=fecha_evento: RegistroBlockchain(
+                    idevento=e.idevento, payloadhash=p, txhash="0x" + sha("tx", p),
+                    blocknumber=2000000 + semilla(p) % 100000,
+                    network="sepolia", chainid="11155111",
+                    contractaddress="0x" + sha("contract", p)[:40],
+                    fechaenvio=f, fechaconfirmacion=f + timedelta(minutes=2),
+                    estado="confirmado", numeroconfirmaciones=12,
+                ),
+            )
+
+            # --- Alerta y garantía por unidad ------------------------------
+            descripcion_alerta = f"{PREFIJO_EXTRA} alerta tenant {tt} {periodo} p{idx:02d}"
+            alerta = cargador.add(
+                Alerta,
+                {"descripcion": descripcion_alerta},
+                lambda d=descripcion_alerta, f=fecha_alerta, u=unidad, e=evento, i=idx: Alerta(
+                    idtenant=tt, idunidad=u.idunidad, idevento=e.idevento,
+                    tipoalerta=TIPOS_ALERTA[(i + mes) % len(TIPOS_ALERTA)],
+                    descripcion=d, gravedad=GRAVEDADES[i % len(GRAVEDADES)],
+                    fechadeteccion=f,
+                    fecharesolucion=f + timedelta(hours=2) if i % 2 == 0 else None,
+                    estado="resuelta" if i % 2 == 0 else "en_proceso",
+                    idusuarioresolutor=idusuario if i % 2 == 0 else None,
+                ),
+            )
+            cargador.add(
+                GarantiaUnidad,
+                {"idunidad": unidad.idunidad},
+                lambda u=unidad, f=fecha_venta: GarantiaUnidad(
+                    idunidad=u.idunidad, fechainicio=f.date(),
+                    fechafin=f.date() + timedelta(days=365),
+                    proveedor="Apple Inc.",
+                    condiciones=f"Garantia historica {PREFIJO_EXTRA} {periodo}",
+                ),
+            )
+
+            # --- Devolución y documento (cadencia bimensual) ---------------
+            if mes % 6 == 0:
+                fecha_dev = fecha_venta + timedelta(days=6)
+                devolucion = cargador.add(
+                    Devolucion,
+                    {"idventa": venta.idventa, "fechadevolucion": fecha_dev},
+                    lambda v=venta, f=fecha_dev, p=periodo: Devolucion(
+                        idventa=v.idventa, fechadevolucion=f,
+                        motivo="daño_transporte",
+                        descripcion=f"{PREFIJO_EXTRA} devolucion {p}",
+                        estado="procesada",
+                    ),
+                )
+                cargador.add(
+                    DevolucionUnidad,
+                    {"idunidad": unidad.idunidad},
+                    lambda d=devolucion, u=unidad: DevolucionUnidad(
+                        iddevolucion=d.iddevolucion, idunidad=u.idunidad
+                    ),
+                )
+                nombre_doc = f"{PREFIJO_EXTRA}-DOC-{tt}-{periodo}-P{idx:02d}"
+                fecha_doc = dia_en_mes(
+                    anio, mes, semilla(tt, periodo, PREFIJO_EXTRA, idx, "doc"), min_dia=9
+                ).date()
+                cargador.add(
+                    DocumentoUnidad,
+                    {"idunidad": unidad.idunidad, "nombre": nombre_doc},
+                    lambda u=unidad, n=nombre_doc, f=fecha_doc, i=idx: DocumentoUnidad(
+                        idunidad=u.idunidad, nombre=n,
+                        urlarchivo=f"https://docs.demo.local/{PREFIJO_EXTRA}/{n}.pdf",
+                        hasharchivo=sha("doc", n), fechaemision=f,
+                        fechavencimiento=f + timedelta(days=365),
+                        tipodocumento=TIPOS_DOCUMENTO[i % len(TIPOS_DOCUMENTO)],
+                    ),
+                )
+
+            # --- Reporte de sospecha con evidencia (cada 3 meses) ----------
+            if mes % 3 == 0:
+                ticket = f"{PREFIJO_EXTRA}-{tt}-{periodo}-P{idx:02d}"
+                fecha_reporte = dia_en_mes(
+                    anio, mes, semilla(tt, periodo, PREFIJO_EXTRA, idx, "rep"), min_dia=16
+                )
+                reporte = cargador.add(
+                    ReporteSospecha,
+                    {"codigoticket": ticket},
+                    lambda tk=ticket, f=fecha_reporte, u=unidad, a=alerta, i=idx: ReporteSospecha(
+                        codigoticket=tk, idtenant=tt, idunidad=u.idunidad,
+                        idusuario=idusuario,
+                        tipoanomalia=TIPOS_ANOMALIA[(mes + i) % len(TIPOS_ANOMALIA)],
+                        descripcion=f"{PREFIJO_EXTRA} reporte {periodo} p{i:02d}",
+                        latitud=Decimal("-16.489700"), longitud=Decimal("-68.119300"),
+                        estado=ESTADOS_REPORTE[(mes + i) % len(ESTADOS_REPORTE)],
+                        gravedad=GRAVEDADES[(mes + i) % len(GRAVEDADES)],
+                        idalerta=a.idalerta, score_ml=Decimal("0.6800"),
+                        sugerencia_ml="verificar", creadoen=f, actualizadoen=f,
+                    ),
+                )
+                hash_evidencia = sha("evidencia", PREFIJO_EXTRA, ticket)
+                cargador.add(
+                    ReporteSospechaEvidencia,
+                    {"hashsha256": hash_evidencia},
+                    lambda r=reporte, h=hash_evidencia, f=fecha_reporte, tk=ticket: ReporteSospechaEvidencia(
+                        idreporte=r.idreporte, nombrearchivo=f"{tk}.jpg",
+                        tipomime="image/jpeg", tamanobytes=98304,
+                        urlalmacenamiento=f"https://storage.demo.local/{PREFIJO_EXTRA}/{tk}.jpg",
+                        hashsha256=h, creadoen=f,
+                    ),
+                )
+
+        # Devoluciones para los 3 productos del bloque HIST. Sin esto, las
+        # fichas de esos productos mostraban 0 devoluciones aunque tuvieran
+        # ventas reales en el mismo periodo.
+        if mes % 6 == 0 and variantes_base:
+            inicio_mes = datetime(anio, mes, 1)
+            fin_mes = datetime(anio + mes // 12, mes % 12 + 1, 1)
+            unidades_base = db.execute(
+                select(UnidadProducto).where(
+                    UnidadProducto.idtenant == tt,
+                    UnidadProducto.idvariante.in_(variantes_base),
+                    UnidadProducto.estado == "vendido",
+                    UnidadProducto.fechaventa >= inicio_mes,
+                    UnidadProducto.fechaventa < fin_mes,
+                )
+            ).scalars().all()
+            for unidad_base in unidades_base:
+                venta_base = db.execute(
+                    select(Venta)
+                    .join(VentaDetalle, VentaDetalle.idventa == Venta.idventa)
+                    .where(
+                        Venta.idtenant == tt,
+                        VentaDetalle.idvariante == unidad_base.idvariante,
+                        Venta.fechaventa >= inicio_mes,
+                        Venta.fechaventa < fin_mes,
+                    )
+                ).scalars().first()
+                if venta_base is None:
+                    continue
+                fecha_devolucion = dia_en_mes(
+                    anio, mes,
+                    semilla(tt, periodo, PREFIJO_EXTRA, "devbase", unidad_base.idunidad),
+                    min_dia=20,
+                )
+                devolucion_base = cargador.add(
+                    Devolucion,
+                    {"idventa": venta_base.idventa, "fechadevolucion": fecha_devolucion},
+                    lambda v=venta_base, f=fecha_devolucion, p=periodo: Devolucion(
+                        idventa=v.idventa, fechadevolucion=f,
+                        motivo="daño_transporte",
+                        descripcion=f"{PREFIJO_EXTRA} devolucion base {p}",
+                        estado="procesada",
+                    ),
+                )
+                cargador.add(
+                    DevolucionUnidad,
+                    {"idunidad": unidad_base.idunidad},
+                    lambda d=devolucion_base, u=unidad_base: DevolucionUnidad(
+                        iddevolucion=d.iddevolucion, idunidad=u.idunidad
+                    ),
+                )
 
 
 def main(argv=None, *, meses: Optional[int] = None, manifest: Optional[str] = None) -> int:

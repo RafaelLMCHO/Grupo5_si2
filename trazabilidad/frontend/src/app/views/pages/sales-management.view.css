@@ -10,6 +10,8 @@
 .btn-secondary { background: #334155; color: #f8fafc; }
 .btn-secondary:hover { background: #475569; }
 .btn-small { background: #0c4a6e; color: #7dd3fc; padding: .35rem .65rem; font-size: .78rem; }
+.btn-stripe { background: #635bff; color: #ffffff; font-weight: 600; margin-left: 0.35rem; }
+.btn-stripe:hover { background: #4b45c6; }
 .s4-content { padding: 1.5rem 2rem; max-width: 1400px; margin: 0 auto; }
 .alert-success { background: #064e3b; border: 1px solid #059669; color: #a7f3d0; padding: .7rem 1rem; border-radius: 8px; margin-bottom: 1rem; }
 .alert-error { background: #7f1d1d; border: 1px solid #dc2626; color: #fecaca; padding: .7rem 1rem; border-radius: 8px; margin-bottom: 1rem; }

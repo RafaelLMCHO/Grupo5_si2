@@ -108,7 +108,7 @@ export class DashboardController implements OnInit {
 
     switch (module) {
       case 'tenants':
-        return roles.includes('AdministradorEmpresa');
+        return false;
 
       case 'users':
       case 'roles':

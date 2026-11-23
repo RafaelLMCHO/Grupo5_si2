@@ -31,3 +31,36 @@ class PagoResponse(BaseModel):
 class PagoListResponse(BaseModel):
     total: int
     items: List[PagoResponse]
+
+
+class CheckoutVentaRequest(BaseModel):
+    idventa: int = Field(..., gt=0)
+
+
+class CheckoutResponse(BaseModel):
+    """Respuesta aditiva de Checkout (Stripe). No altera PagoResponse."""
+
+    idpago: int
+    idventa: int
+    checkout_id: str
+    checkout_url: str
+    estado: str
+    monto: Decimal
+    expira_en: int | None = None
+
+
+class CheckoutStatusResponse(BaseModel):
+    idpago: int
+    estado: str
+    proveedor: str
+    checkout_id: str | None = None
+    estado_pasarela: str | None = None
+    pago_pasarela: str | None = None
+    pago_confirmado: str | None = None
+
+
+class WebhookResponse(BaseModel):
+    recibido: bool = True
+    duplicado: bool = False
+    tipo: str | None = None
+    referencia: str | None = None

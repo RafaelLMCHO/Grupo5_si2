@@ -32,51 +32,46 @@ def _crear_roles_unicos(db_session, cantidad):
     return roles
 
 
-def test_list_roles(client, setup_test_data):
-    headers = get_auth_header(client, setup_test_data)
-    response = client.get("/api/v1/roles", headers=headers)
+def test_list_roles(client, auth_headers):
+    response = client.get("/api/v1/roles", headers=auth_headers)
     assert response.status_code == 200
     roles = response.json()
     assert isinstance(roles, list)
     assert len(roles) >= 1
 
 
-def test_list_permissions(client, setup_test_data):
-    headers = get_auth_header(client, setup_test_data)
-    response = client.get("/api/v1/permissions", headers=headers)
+def test_list_permissions(client, auth_headers):
+    response = client.get("/api/v1/permissions", headers=auth_headers)
     assert response.status_code == 200
     perms = response.json()
     assert isinstance(perms, list)
 
 
-def test_get_role_permissions(client, setup_test_data, db_session):
-    headers = get_auth_header(client, setup_test_data)
+def test_get_role_permissions(client, auth_headers, db_session):
     rol = _crear_roles_unicos(db_session, 1)[0]
-    response = client.get(f"/api/v1/roles/{rol.idrol}/permissions", headers=headers)
+    response = client.get(f"/api/v1/roles/{rol.idrol}/permissions", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert "role" in data
     assert "permissions" in data
 
 
-def test_get_user_roles(client, setup_test_data):
-    headers = get_auth_header(client, setup_test_data)
+def test_get_user_roles(client, auth_headers, setup_test_data):
     u1 = setup_test_data["user1"]
-    response = client.get(f"/api/v1/users/{u1.idusuario}/roles", headers=headers)
+    response = client.get(f"/api/v1/users/{u1.idusuario}/roles", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["idusuario"] == u1.idusuario
     assert isinstance(data["roles"], list)
 
 
-def test_assign_user_roles(client, setup_test_data, db_session):
-    headers = get_auth_header(client, setup_test_data)
+def test_assign_user_roles(client, auth_headers, setup_test_data, db_session):
     u1 = setup_test_data["user1"]
     roles = _crear_roles_unicos(db_session, 2)
     ids_creados = [r.idrol for r in roles]
 
     payload = {"role_ids": ids_creados}
-    response = client.post(f"/api/v1/users/{u1.idusuario}/roles", json=payload, headers=headers)
+    response = client.post(f"/api/v1/users/{u1.idusuario}/roles", json=payload, headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert len(data["roles"]) == 2

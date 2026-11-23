@@ -58,6 +58,18 @@ class FacturaListResponse(BaseModel):
     items: List[FacturaResponse]
 
 
+class InvoiceCheckoutResponse(BaseModel):
+    """Checkout de una factura SaaS con Stripe (ADR-013)."""
+
+    idcobro: int
+    idfactura: int
+    checkout_id: str
+    checkout_url: str
+    estado: str
+    monto: Decimal
+    expira_en: int | None = None
+
+
 class HistorialFacturacionResponse(BaseModel):
     idtenant: int
     totalfacturado: Decimal

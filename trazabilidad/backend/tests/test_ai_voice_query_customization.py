@@ -330,6 +330,59 @@ def test_exportacion_incluye_ficha_detallada(
     assert pdf.content.startswith(b"%PDF")
 
 
+def test_selector_seed_top10_excluye_base_y_productos_genericos(db_session, setup_test_data):
+    """El bloque HSALE elige 10 productos reales distintos, sin repetir HIST."""
+    from seed_historical_6m import seleccionar_variantes_top10
+
+    t1 = setup_test_data["tenant1"]
+    base = _crear_venta(db_session, t1, "Base Historica", 1, 100, AHORA)
+    variante_base = _publicar_en_catalogo(db_session, t1, base)
+
+    creados = []
+    for idx in range(10):
+        producto = _crear_venta(db_session, t1, f"Top Real {idx:02d}", 1, 100, AHORA)
+        _publicar_en_catalogo(db_session, t1, producto)
+        creados.append(producto)
+
+    generico = _crear_venta(db_session, t1, "Producto Tenant 9999", 1, 100, AHORA)
+    _publicar_en_catalogo(db_session, t1, generico)
+
+    elegidas = seleccionar_variantes_top10(
+        db_session, t1.idtenant, [variante_base.idvariante]
+    )
+    assert len(elegidas) == 10
+    ids_producto = {fila[1] for fila in elegidas}
+    assert len(ids_producto) == 10
+    assert base.idproducto not in ids_producto
+    assert generico.idproducto not in ids_producto
+    assert {p.idproducto for p in creados} <= ids_producto
+
+
+def test_ranking_top_10_devuelve_diez_filas_cuando_hay_senal(
+    client, db_session, setup_test_data, auth_headers
+):
+    """Regresión: el tope es un máximo, pero con 10 productos debe llenarse."""
+    t1 = setup_test_data["tenant1"]
+    fecha = datetime.utcnow() - timedelta(days=5)
+    creados = []
+    for idx in range(10):
+        producto = _crear_venta(
+            db_session, t1, f"Ranking Diez {idx:02d}", 5000 + idx, 1000, fecha
+        )
+        creados.append(producto)
+
+    resp = client.post(
+        "/api/v1/ai/voice-report",
+        json={"query": "top 10 productos mas vendidos en el ultimo trimestre"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert len(data["table_rows"]) == 10
+    nombres = {fila[1] for fila in data["table_rows"]}
+    assert all(producto.nombre in nombres for producto in creados)
+
+
 def test_exportacion_rechaza_reporte_de_otra_empresa(client, setup_test_data, auth_headers):
     t2 = setup_test_data["tenant2"]
     generado = client.post(

@@ -20,6 +20,24 @@ from app.packages.p1_seguridad.views.cu001_tenants.tenant_views import TenantRes
 router = APIRouter(prefix="/users", tags=["Gestión de Usuarios (CU-002)"])
 
 
+def _require_admin_or_superadmin(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> User:
+    from app.controllers.shared import require_roles
+    checker = require_roles("SuperAdministrador", "AdministradorEmpresa")
+    return checker(db=db, current_user=current_user)
+
+
+def _require_gestion_or_auditor(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> User:
+    from app.controllers.shared import require_roles
+    checker = require_roles("SuperAdministrador", "AdministradorEmpresa", "Auditor")
+    return checker(db=db, current_user=current_user)
+
+
 class UserController:
     @staticmethod
     def _build_user_response(db: Session, user: User) -> UserResponse:
@@ -46,22 +64,20 @@ class UserController:
         skip: int = 0,
         limit: int = 50
     ) -> UserListResponse:
-        # Determinar contexto de empresa objetivo
-        target_tenant_id = tenant_id
-        if target_tenant_id is None:
-            if hasattr(current_user, 'tenant') and current_user.tenant:
-                target_tenant_id = current_user.tenant.idtenant
-            else:
-                stmt_tenant_link = select(UsuarioTenant.idtenant).where(
-                    UsuarioTenant.idusuario == current_user.idusuario
-                )
-                target_tenant_id = db.execute(stmt_tenant_link).scalars().first()
+        from app.controllers.shared import _es_superadmin, resolve_tenant_id
 
+        is_super = _es_superadmin(db, current_user)
         query = select(User).distinct()
 
-        # Filtrar por empresa salvo que target_tenant_id sea -1 (mostrar todo)
-        if target_tenant_id and target_tenant_id != -1:
-            query = query.join(UsuarioTenant, UsuarioTenant.idusuario == User.idusuario).where(UsuarioTenant.idtenant == target_tenant_id)
+        # Aislamiento multi-tenant:
+        # SuperAdministrador puede filtrar por empresa o ver todo.
+        # Demás roles: OBLIGATORIAMENTE su empresa activa.
+        if is_super:
+            if tenant_id and tenant_id != -1:
+                query = query.join(UsuarioTenant, UsuarioTenant.idusuario == User.idusuario).where(UsuarioTenant.idtenant == tenant_id)
+        else:
+            active_tenant_id = resolve_tenant_id(db, current_user)
+            query = query.join(UsuarioTenant, UsuarioTenant.idusuario == User.idusuario).where(UsuarioTenant.idtenant == active_tenant_id)
 
         if search and search.strip():
             term = f"%{search.strip().lower()}%"
@@ -90,6 +106,8 @@ class UserController:
         current_user: User,
         data: UserCreate
     ) -> UserResponse:
+        from app.controllers.shared import _es_superadmin, resolve_tenant_id
+
         email_clean = data.email.strip().lower()
 
         # 1. Validar correo único
@@ -109,15 +127,10 @@ class UserController:
             )
 
         # 3. ID de empresa objetivo
-        target_tenant_id = data.idtenant
-        if not target_tenant_id:
-            stmt_link = select(UsuarioTenant.idtenant).where(
-                UsuarioTenant.idusuario == current_user.idusuario
-            )
-            target_tenant_id = db.execute(stmt_link).scalar()
-
-        if not target_tenant_id:
-            target_tenant_id = 1  # Respaldo a empresa por defecto 1
+        if _es_superadmin(db, current_user):
+            target_tenant_id = data.idtenant or resolve_tenant_id(db, current_user) or 1
+        else:
+            target_tenant_id = resolve_tenant_id(db, current_user)
 
         user = User(
             nombrecompleto=data.nombrecompleto.strip(),
@@ -138,7 +151,9 @@ class UserController:
         return UserController._build_user_response(db, user)
 
     @staticmethod
-    def get_user(db: Session, idusuario: int) -> UserResponse:
+    def get_user(db: Session, current_user: User, idusuario: int) -> UserResponse:
+        from app.controllers.shared import _es_superadmin, resolve_tenant_id
+
         stmt = select(User).where(User.idusuario == idusuario)
         user = db.execute(stmt).scalar_one_or_none()
         if not user:
@@ -146,11 +161,33 @@ class UserController:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Usuario con ID {idusuario} no encontrado."
             )
+
+        # Aislamiento: salvo SuperAdministrador, solo ver usuarios de su empresa activa
+        if not _es_superadmin(db, current_user):
+            active_tenant_id = resolve_tenant_id(db, current_user)
+            stmt_link = select(UsuarioTenant.idusuariotenant).where(
+                UsuarioTenant.idusuario == idusuario,
+                UsuarioTenant.idtenant == active_tenant_id
+            )
+            if db.execute(stmt_link).first() is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Usuario con ID {idusuario} no encontrado."
+                )
 
         return UserController._build_user_response(db, user)
 
     @staticmethod
-    def update_user(db: Session, idusuario: int, data: UserUpdate) -> UserResponse:
+    def update_user(db: Session, current_user: User, idusuario: int, data: UserUpdate) -> UserResponse:
+        from app.controllers.shared import _es_superadmin, resolve_tenant_id
+
+        # 4. Un usuario no puede desactivarse a sí mismo
+        if idusuario == current_user.idusuario and data.activo is False:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Un usuario no puede desactivarse a sí mismo."
+            )
+
         stmt = select(User).where(User.idusuario == idusuario)
         user = db.execute(stmt).scalar_one_or_none()
         if not user:
@@ -158,6 +195,26 @@ class UserController:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Usuario con ID {idusuario} no encontrado."
             )
+
+        is_super = _es_superadmin(db, current_user)
+        if not is_super:
+            active_tenant_id = resolve_tenant_id(db, current_user)
+            stmt_link = select(UsuarioTenant.idusuariotenant).where(
+                UsuarioTenant.idusuario == idusuario,
+                UsuarioTenant.idtenant == active_tenant_id
+            )
+            if db.execute(stmt_link).first() is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Usuario con ID {idusuario} no encontrado."
+                )
+
+            # 5. Un AdministradorEmpresa no puede editar a un SuperAdministrador
+            if _es_superadmin(db, user):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Un Administrador de Empresa no tiene privilegios para modificar a un SuperAdministrador."
+                )
 
         if data.email and data.email.strip().lower() != user.email:
             email_clean = data.email.strip().lower()
@@ -193,7 +250,16 @@ class UserController:
         return UserController._build_user_response(db, user)
 
     @staticmethod
-    def delete_user(db: Session, idusuario: int) -> UserResponse:
+    def delete_user(db: Session, current_user: User, idusuario: int) -> UserResponse:
+        from app.controllers.shared import _es_superadmin, resolve_tenant_id
+
+        # 4. Un usuario no puede eliminarse ni desactivarse a sí mismo
+        if idusuario == current_user.idusuario:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Un usuario no puede eliminarse ni desactivarse a sí mismo."
+            )
+
         stmt = select(User).where(User.idusuario == idusuario)
         user = db.execute(stmt).scalar_one_or_none()
         if not user:
@@ -201,6 +267,26 @@ class UserController:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Usuario con ID {idusuario} no encontrado."
             )
+
+        is_super = _es_superadmin(db, current_user)
+        if not is_super:
+            active_tenant_id = resolve_tenant_id(db, current_user)
+            stmt_link = select(UsuarioTenant.idusuariotenant).where(
+                UsuarioTenant.idusuario == idusuario,
+                UsuarioTenant.idtenant == active_tenant_id
+            )
+            if db.execute(stmt_link).first() is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Usuario con ID {idusuario} no encontrado."
+                )
+
+            # 5. Un AdministradorEmpresa no puede eliminar a un SuperAdministrador
+            if _es_superadmin(db, user):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Un Administrador de Empresa no tiene privilegios para eliminar a un SuperAdministrador."
+                )
 
         user.activo = False
         db.commit()
@@ -210,7 +296,11 @@ class UserController:
 
 
 # Rutas HTTP
-@router.get("", response_model=UserListResponse)
+@router.get(
+    "",
+    response_model=UserListResponse,
+    dependencies=[Depends(_require_gestion_or_auditor)]
+)
 def get_users(
     search: Optional[str] = Query(None, description="Buscador por nombre o correo"),
     tenant_id: Optional[int] = Query(None, description="Filtrar por empresa especifica"),
@@ -219,46 +309,63 @@ def get_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Listar usuarios del sistema (CU-002)."""
+    """Listar usuarios del sistema (CU-002) - SuperAdministrador, AdministradorEmpresa, Auditor."""
     return UserController.list_users(db, current_user, search, tenant_id, skip, limit)
 
 
-@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(_require_admin_or_superadmin)]
+)
 def create_user(
     data: UserCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Registrar un nuevo usuario en el sistema (CU-002)."""
+    """Registrar un nuevo usuario en el sistema (CU-002) - SuperAdministrador, AdministradorEmpresa."""
     return UserController.create_user(db, current_user, data)
 
 
-@router.get("/{idusuario}", response_model=UserResponse)
+@router.get(
+    "/{idusuario}",
+    response_model=UserResponse,
+    dependencies=[Depends(_require_gestion_or_auditor)]
+)
 def get_user_by_id(
     idusuario: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Obtener los detalles de un usuario por su ID (CU-002)."""
-    return UserController.get_user(db, idusuario)
+    """Obtener los detalles de un usuario por su ID (CU-002) - SuperAdministrador, AdministradorEmpresa, Auditor."""
+    return UserController.get_user(db, current_user, idusuario)
 
 
-@router.put("/{idusuario}", response_model=UserResponse)
+@router.put(
+    "/{idusuario}",
+    response_model=UserResponse,
+    dependencies=[Depends(_require_admin_or_superadmin)]
+)
 def update_user(
     idusuario: int,
     data: UserUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Actualizar información de un usuario existente (CU-002)."""
-    return UserController.update_user(db, idusuario, data)
+    """Actualizar información de un usuario existente (CU-002) - SuperAdministrador, AdministradorEmpresa."""
+    return UserController.update_user(db, current_user, idusuario, data)
 
 
-@router.delete("/{idusuario}", response_model=UserResponse)
+@router.delete(
+    "/{idusuario}",
+    response_model=UserResponse,
+    dependencies=[Depends(_require_admin_or_superadmin)]
+)
 def delete_user(
     idusuario: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Desactivación lógica de un usuario (CU-002)."""
-    return UserController.delete_user(db, idusuario)
+    """Desactivación lógica de un usuario (CU-002) - SuperAdministrador, AdministradorEmpresa."""
+    return UserController.delete_user(db, current_user, idusuario)

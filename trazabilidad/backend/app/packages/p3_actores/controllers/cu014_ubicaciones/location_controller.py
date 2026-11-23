@@ -8,7 +8,7 @@ from app.models.cu014_ubicaciones.location import Ubicacion
 from app.models.cu013_actores_cadena.actor import ActorCadena
 from app.models.cu002_usuarios.user import User
 from app.controllers.cu004_autenticacion.auth_controller import get_current_user
-from app.controllers.shared import get_user_tenant_id, require_roles
+from app.controllers.shared import resolve_tenant_id, require_roles
 from app.views.cu014_ubicaciones.location_views import (
     LocationCreate,
     LocationUpdate,
@@ -35,7 +35,7 @@ class LocationController:
         skip: int = 0,
         limit: int = 50
     ) -> LocationListResponse:
-        tenant_id = get_user_tenant_id(db, user)
+        tenant_id = resolve_tenant_id(db, user)
         query = select(Ubicacion).where(Ubicacion.idtenant == tenant_id)
 
         if tipo and tipo.strip():
@@ -65,7 +65,7 @@ class LocationController:
 
     @staticmethod
     def create_location(db: Session, user: User, data: LocationCreate) -> LocationResponse:
-        tenant_id = get_user_tenant_id(db, user)
+        tenant_id = resolve_tenant_id(db, user)
 
         if data.idactor:
             stmt_a = select(ActorCadena).where(
@@ -93,7 +93,7 @@ class LocationController:
 
     @staticmethod
     def update_location(db: Session, user: User, idubicacion: int, data: LocationUpdate) -> LocationResponse:
-        tenant_id = get_user_tenant_id(db, user)
+        tenant_id = resolve_tenant_id(db, user)
         stmt = select(Ubicacion).where(
             Ubicacion.idubicacion == idubicacion,
             Ubicacion.idtenant == tenant_id
@@ -125,7 +125,7 @@ class LocationController:
 
     @staticmethod
     def delete_location(db: Session, user: User, idubicacion: int):
-        tenant_id = get_user_tenant_id(db, user)
+        tenant_id = resolve_tenant_id(db, user)
         stmt = select(Ubicacion).where(
             Ubicacion.idubicacion == idubicacion,
             Ubicacion.idtenant == tenant_id

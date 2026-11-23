@@ -13,6 +13,8 @@ class TenantBase(BaseModel):
 
 class TenantCreate(TenantBase):
     activo: Optional[bool] = True
+    password: Optional[str] = None
+    idplan: Optional[int] = None
 
 
 class TenantUpdate(BaseModel):

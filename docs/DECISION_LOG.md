@@ -21,6 +21,8 @@ Este documento registra cronológicamente las decisiones arquitectónicas fundam
 * [ADR-009: Agregado analítico P7 y manifest histórico de 36 meses](#adr-009-agregado-analítico-p7-y-manifest-histórico-de-36-meses)
 * [ADR-010: Intérprete determinista y ranking por tenant para el asistente de informes por voz](#adr-010-intérprete-determinista-y-ranking-por-tenant-para-el-asistente-de-informes-por-voz)
 * [ADR-011: Ficha detallada de producto a 36 meses y seed suplementario por tenant](#adr-011-ficha-detallada-de-producto-a-36-meses-y-seed-suplementario-por-tenant)
+* [ADR-012: Señal comercial suplementaria `HSALE` para llenar el `top 10` por período](#adr-012-señal-comercial-suplementaria-hsale-para-llenar-el-top-10-por-período)
+* [ADR-013: Stripe Checkout de pago único para ventas y facturas SaaS](#adr-013-stripe-checkout-de-pago-único-para-ventas-y-facturas-saas)
 
 ---
 
@@ -177,3 +179,42 @@ Este documento registra cronológicamente las decisiones arquitectónicas fundam
    * *Positivas:* ficha por producto con métricas reales y comparables entre empresas; rango fijo que evita resultados vacíos por períodos cortos; aislamiento reforzado en todas las tablas hijas; seed reproducible y seguro para `--dry-run`/`--reset-history`.
    * *Negativas:* más agregaciones por consulta y mayor volumen del manifest; las métricas de la ficha ignoran el período pedido por diseño (se explica en la insignia y en `filters_applied`).
    * *Contramedida:* 4 tests nuevos cubren detección del disparador, rango 36m aunque la consulta pida 1 mes, métricas > 0 con datos sembrados, invisibilidad de producto ajeno y exportación con la hoja de detalle. Suite en **202 passed, 0 failed, 0 errors**; `npm run build` y `flutter analyze` en verde.
+
+
+---
+
+### ADR-012: Señal comercial suplementaria `HSALE` para llenar el `top 10` por período
+
+* **Estado:** Aceptado
+* **Fecha:** 2026-11-22
+* **Contexto:** El usuario reportó que «top 10 unidades vendidas en el último trimestre» devolvía solo 6 filas. No era un bug de paginación: `ranking_consolidado[:limite]` aplica el tope como máximo y en ese rango solo 6 productos tenían señal. El bloque `HIST` del seed vendía sobre las 3 primeras variantes activas y las 3 restantes venían del seed canónico; los demás productos del catálogo (21–37 variantes por tenant) nunca tenían ventas en el período.
+* **Decisión:**
+   1. Añadir a `seed_historical_6m.py` (reutilizado por `seed_historical_36m.py`) un bloque idempotente con prefijo de clave propio **`HSALE`**, separado de `HIST`, que no altera claves ya insertadas. Las claves naturales siguen siendo deterministas (número de serie, token QR, ticket, payload hash, `descripcion`).
+   2. `seleccionar_variantes_top10()` elige **una variante activa por producto distinto**, excluye los productos de las 3 variantes base y descarta nombres `Producto Tenant %`; ordena por `Producto.nombre` para priorizar productos reales del catálogo. Tope: 10 productos por tenant (7 en tenants 2–5, que tienen exactamente 10 productos activos → 10 productos con señal en total).
+   3. Para cada producto/mes del rango de 36 meses se generan: unidad `vendido` + QR + consulta pública, venta registrada + detalle + asignación + pago completado, evento de venta + condición de transporte + anclaje blockchain, alerta y garantía. En cadencias bimensual/trimestral se añaden unidad disponible, devolución, documento y reporte de sospecha con evidencia. Se crea un cliente distinto por producto para que cada `Venta` tenga clave única y `total` cuadre con su detalle.
+   4. Se añaden devoluciones para las unidades vendidas de los 3 productos `HIST` en meses `mes % 6 == 0`, de modo que ninguna ficha del `top 10` muestre `0` en devoluciones. El motivo usa el valor válido del enum (`daño_transporte`).
+   5. La regeneración se hizo con `--reset-history` + ejecución real (el manifest sólo contiene filas del seed, nunca datos operacionales). Manifest final: **41.838 IDs**. `--dry-run` posterior: **0 filas nuevas**.
+* **Consecuencias:**
+   * *Positivas:* `top 10` del último trimestre devuelve **10 filas en los 5 tenants**, con nombres reales; las 50 fichas resultantes tienen todas sus métricas > 0; cero regresiones (204 tests verdes) y contratos `/api/v1` intactos.
+   * *Negativas:* ~21.400 filas adicionales en la BD local y manifest más grande; el seed tarda unos segundos más.
+   * *Contramedida:* 2 tests nuevos cubren el selector (excluye base y genéricos, máximo 10, productos distintos) y el ranking lleno con 10 productos con venta en el trimestre. Verificación directa en BD por tenant y ficha de cada una de las 50 filas.
+
+---
+
+### ADR-013: Stripe Checkout de pago único para ventas y facturas SaaS
+
+* **Estado:** Aceptado
+* **Fecha:** 2026-11-22
+* **Contexto:** Hasta ahora `Pago.metodopago` y `Cobro.metodopago` eran sólo etiquetas: no existía pasarela, cobro online ni confirmación automática. El usuario eligió **Stripe** y pidió cubrir primero **pago único** (ventas P5 y facturación SaaS P8), dejando las suscripciones recurrentes y el QR de cobro para una entrega posterior (CU-041/CU-042). El QR existente (CU-016) es de trazabilidad y no debe mezclarse con el cobro.
+* **Decisión:**
+    1. **Capa compartida:** `app/services/payments/stripe_gateway.py` concentra creación de Checkout Session (`mode=payment`), consulta de sesión, reembolso y verificación de firma (`Stripe-Signature`, tolerancia configurable). Los controladores no ven objetos ni llaves de Stripe; `app/services/payments/stripe_webhook.py` despacha los eventos.
+    2. **Contratos aditivos** (prefijos `/api/v1` intactos, endpoints manuales conservados como fallback): `POST /payments/checkout`, `GET /payments/{idpago}/checkout`, `POST /payments/{idpago}/refund`, `POST /invoices/{idfactura}/checkout` y un único `POST /payments/webhook` para ambos frentes.
+    3. **Metadata firmada:** cada sesión lleva `kind=venta|factura`, `tenant_id`, `id` y `ref`. El webhook no usa JWT: valida la firma con `STRIPE_WEBHOOK_SECRET` y resuelve el tenant desde ese metadata, volviendo a verificar el padre (`Venta.idtenant` / `Factura.idtenant`) antes de mutar.
+    4. **Idempotencia:** tabla nueva `stripeevento` con `eventoid` único. Un reenvío del mismo evento devuelve `duplicado=true` y no vuelve a aplicar cambios. Eventos soportados: `checkout.session.completed`, `checkout.session.expired`, `payment_intent.payment_failed` y `charge.refunded`.
+    5. **Columnas aditivas** (migración `c7d8e9f0a1b2`): `proveedor` (default `manual`), `idtransaccion`, `paymentintentid` y `estadopasarela` en `pago` y `cobro`. Ningún enum ni columna existente se altera; los pagos manuales siguen funcionando con `proveedor='manual'`.
+    6. **Efectos de negocio:** al confirmar una venta se reutiliza `PaymentController._sync_venta_estado()` y se escribe en Bitácora (CU-005). Al pagar una factura se reutiliza `BillingController._saldo()`, se marca `factura.estado='pagada'` y se activa/renueva la `Suscripcion` asociada. El reembolso usa el `PaymentIntent` y actualiza estado de venta/factura.
+    7. **Configuración:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_SUCCESS_URL`, `STRIPE_CANCEL_URL` y `STRIPE_WEBHOOK_TOLERANCE_SECONDS` se leen de `.env` (placeholders en `.env.example`; la llave real jamás se versiona). Sin credenciales los endpoints responden `503`, y errores de Stripe `502`; firma inválida → `400`.
+* **Consecuencias:**
+    * *Positivas:* cobro online por venta y por factura con confirmación automática, auditoría y aislamiento multi-tenant; cero rotura de contratos ni de los 204 tests previos.
+    * *Negativas / pendientes:* aún no hay suscripciones recurrentes ni QR de pago; la integración es **backend** (la UI web/móvil podrá redirigir a `checkout_url` en una entrega posterior); el `STRIPE_WEBHOOK_SECRET` de producción sigue pendiente de configurar.
+    * *Contramedida:* 5 tests nuevos (`tests/test_stripe_pagos_cu027_cu039.py`) cubren checkout propio, venta ajena 404, firma inválida 400, webhook duplicado sin efecto, consulta de estado, reembolso y activación de suscripción. Suite completa: **209 passed, 0 failed, 0 errors**; `npm run build` y `flutter analyze` en verde.

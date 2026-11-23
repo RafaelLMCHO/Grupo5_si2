@@ -2,10 +2,13 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, or_
+from sqlalchemy.exc import IntegrityError
 
 from app.db.session import get_db
 from app.models.cu006_productos_variantes.product import Producto
 from app.models.cu006_productos_variantes.variant import VarianteProducto
+from app.models.cu015_unidades_producto.unit import UnidadProducto
+from app.models.cu010_ordenes_compra.purchase import CompraDetalle
 from app.models.cu002_usuarios.user import User
 from app.controllers.cu004_autenticacion.auth_controller import get_current_user
 from app.controllers.shared import require_roles
@@ -22,8 +25,8 @@ from app.views.cu006_productos_variantes.product_views import (
 router = APIRouter(tags=["Gestionar Productos y Variantes (CU-006)"])
 
 # Roles autorizados a crear/editar/bajar productos y variantes del catálogo global.
-# (products:manage en la matriz rol-permisos.)
-ROLES_GESTION_PRODUCTO = ("SuperAdministrador", "AdministradorEmpresa")
+# (products:manage en la matriz rol-permisos: solo SuperAdministrador.)
+ROLES_GESTION_PRODUCTO = ("SuperAdministrador",)
 
 requires_gestion_producto = require_roles(*ROLES_GESTION_PRODUCTO)
 
@@ -130,10 +133,43 @@ class ProductController:
                 detail=f"Producto con ID {idproducto} no encontrado."
             )
 
-        prod.activo = False
-        db.commit()
-        db.refresh(prod)
-        return ProductResponse.model_validate(prod)
+        # 1. Verificar si tiene unidades físicas asociadas
+        stmt_units = (
+            select(func.count(UnidadProducto.idunidad))
+            .join(VarianteProducto, UnidadProducto.idvariante == VarianteProducto.idvariante)
+            .where(VarianteProducto.idproducto == idproducto)
+        )
+        count_units = db.execute(stmt_units).scalar() or 0
+        if count_units > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar el producto: tiene unidades físicas asociadas."
+            )
+
+        # 2. Verificar si tiene compras asociadas
+        stmt_purchases = (
+            select(func.count(CompraDetalle.idcompradetalle))
+            .join(VarianteProducto, CompraDetalle.idvariante == VarianteProducto.idvariante)
+            .where(VarianteProducto.idproducto == idproducto)
+        )
+        count_purchases = db.execute(stmt_purchases).scalar() or 0
+        if count_purchases > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar el producto: tiene compras asociadas."
+            )
+
+        try:
+            prod.activo = False
+            db.commit()
+            db.refresh(prod)
+            return ProductResponse.model_validate(prod)
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar el producto: tiene registros relacionados."
+            )
 
     # Operaciones de variantes
     @staticmethod
@@ -206,9 +242,36 @@ class ProductController:
                 detail=f"Variante con ID {idvariante} no encontrada."
             )
 
-        db.delete(var)
-        db.commit()
-        return {"detail": f"Variante {idvariante} eliminada exitosamente."}
+        # 1. Verificar si tiene unidades físicas asociadas
+        count_units = db.execute(
+            select(func.count(UnidadProducto.idunidad)).where(UnidadProducto.idvariante == idvariante)
+        ).scalar() or 0
+        if count_units > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar la variante: tiene unidades físicas asociadas."
+            )
+
+        # 2. Verificar si tiene compras asociadas
+        count_purchases = db.execute(
+            select(func.count(CompraDetalle.idcompradetalle)).where(CompraDetalle.idvariante == idvariante)
+        ).scalar() or 0
+        if count_purchases > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar la variante: tiene compras asociadas."
+            )
+
+        try:
+            db.delete(var)
+            db.commit()
+            return {"detail": f"Variante {idvariante} eliminada exitosamente."}
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar la variante: tiene registros relacionados."
+            )
 
 
 # Endpoints (Rutas HTTP)

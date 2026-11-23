@@ -3,8 +3,8 @@
 > **Documento:** Referencia Canónica de Casos de Uso (Diátaxis Framework)  
 > **Ubicación:** `docs/USE_CASES_MAP.md`  
 > **Fuente Canónica:** Documento Oficial de Especificación `sprint#3_actualizado.pdf` (Secciones 3.9 y 3.10)  
-> **Metodología:** SCRUM · **Sprint Activo:** **Sprint 3 (Trazabilidad, Blockchain, SaaS y Autenticidad)**  
-> **Estado de Implementación:** Sprints 0, 1, 2 y CU-023/CU-024/CU-032/CU-036/CU-037 **Implementados y Verificados (167 tests verdes en `blacktest`)**  
+> **Metodología:** SCRUM · **Sprint 4 cerrado en backend/web/móvil** · extensión de pagos con Stripe (ADR-013)  
+> **Estado de Implementación:** Sprints 0 a 4 implementados; CU-027 y CU-039 ampliados con **Stripe Checkout de pago único** (webhook firmado, reembolso e idempotencia). Suite: **209 tests verdes**.  
 
 ---
 
@@ -40,7 +40,7 @@ Alineada con la tabla de la Sección 3.9 (páginas 92-94) del documento `sprint#
 | **CU-024** | Gestionar Alertas e Incidencias | 4 | ✓ | ✓ | Alta | P4 | **Implementado (Poblado)** |
 | **CU-025** | Gestionar Ventas | 4 | ✓ | — | Alta | P5 | **Planificado** |
 | **CU-026** | Asignar Unidades Físicas a Venta | 4 | ✓ | — | Alta | P5 | **Planificado** |
-| **CU-027** | Gestionar Pagos | 4 | ✓ | — | Media | P5 | **Planificado** |
+| **CU-027** | Gestionar Pagos | 4 | ✓ | — | Media | P5 | **Implementado (Stripe Checkout, webhook y reembolso)** |
 | **CU-028** | Consultar Historial de Compras del Consumidor | 4 | ✓ | ✓ | Media | P5 | **Planificado** |
 | **CU-029** | Gestionar Devoluciones | 4 | ✓ | — | Alta | P5 | **Planificado** |
 | **CU-030** | Asignar Unidades a Devolución | 4 | ✓ | — | Alta | P5 | **Planificado** |
@@ -52,7 +52,7 @@ Alineada con la tabla de la Sección 3.9 (páginas 92-94) del documento `sprint#
 | **CU-036** | Gestionar Planes de Suscripción | 3 | ✓ | — | Alta | P8 | **Implementado** |
 | **CU-037** | Gestionar Suscripción y Pagos | 3 | ✓ | — | Alta | P8 | **Implementado** |
 | **CU-038** | Controlar Cuotas y Consumo | 3 | ✓ (Backend) | — | Alta | P8 | **Planificado (Sprint 4)** |
-| **CU-039** | Gestionar Facturación e Historial | 3 | ✓ | — | Media | P8 | **Planificado (Sprint 4)** |
+| **CU-039** | Gestionar Facturación e Historial | 3 | ✓ | — | Media | P8 | **Implementado (Stripe Checkout en facturas, activa suscripción)** |
 | **CU-040** | Notificar Eventos de Facturación | 3 | ✓ | ✓ | Media | P8 | **Planificado (Sprint 4)** |
 
 ---
