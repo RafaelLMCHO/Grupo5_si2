@@ -25,11 +25,15 @@
           }
         </select>
         <button class="btn-secondary" (click)="loadShipments()">Actualizar</button>
-        <button class="btn-primary" (click)="openCreateModal()">+ Nuevo Envío</button>
+        @if (canManageShipments()) {
+          <button class="btn-primary" (click)="openCreateModal()">+ Nuevo Envío</button>
+        }
       </div>
-      <div class="total-count">
-        Total: <strong>{{ shipments().length }}</strong> envíos registrados
-      </div>
+      @if (!errorMessage()) {
+        <div class="total-count">
+          Total: <strong>{{ shipments().length }}</strong> envíos registrados
+        </div>
+      }
     </div>
 
     <div class="grid-card">
@@ -69,10 +73,10 @@
                 <td class="action-buttons">
                   <button class="btn-sm btn-info" (click)="openTimeline(s)">📍 Línea de Tiempo</button>
                   <button class="btn-sm btn-info" (click)="openUnitsModal(s)">📦 Unidades</button>
-                  @if (s.estado.toLowerCase() === 'preparacion') {
+                  @if (canManageShipments() && s.estado.toLowerCase() === 'preparacion') {
                     <button class="btn-sm btn-secondary" (click)="openEditModal(s)">Editar</button>
                   }
-                  @if (transicionesDisponibles(s.estado).length > 0) {
+                  @if (canManageShipments() && transicionesDisponibles(s.estado).length > 0) {
                     <select class="btn-sm estado-select"
                             [ngModel]="''"
                             (ngModelChange)="cambiarEstado(s, $event)">
@@ -82,15 +86,19 @@
                       }
                     </select>
                   }
-                  <button class="btn-sm btn-primary" (click)="openRecordModal(s)">+ Registrar Hito / Sensor</button>
+                  @if (canManageShipments()) {
+                    <button class="btn-sm btn-primary" (click)="openRecordModal(s)">+ Registrar Hito / Sensor</button>
+                  }
                 </td>
               </tr>
             } @empty {
-              <tr>
-                <td colspan="7" style="text-align: center; color: #94a3b8; padding: 2rem;">
-                  No hay envíos logísticos registrados.
-                </td>
-              </tr>
+              @if (!errorMessage()) {
+                <tr>
+                  <td colspan="7" style="text-align: center; color: #94a3b8; padding: 2rem;">
+                    No hay envíos logísticos registrados.
+                  </td>
+                </tr>
+              }
             }
           </tbody>
         </table>

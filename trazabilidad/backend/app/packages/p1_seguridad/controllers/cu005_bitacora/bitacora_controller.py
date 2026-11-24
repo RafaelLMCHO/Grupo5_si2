@@ -26,16 +26,41 @@ router = APIRouter(tags=["Bitácora de Auditoría y Notificaciones (CU-005)"])
 
 
 class BitacoraController:
-    # 1. Consultar registros de bitácora con filtros (acción, entidad) y paginación
+    # 1. Consultar registros de bitácora con filtros (acción, entidad, tenant) y paginación
     @staticmethod
     def list_bitacora(
         db: Session,
+        current_user: User,
         accion: Optional[str] = None,
         entidad: Optional[str] = None,
+        tenant_id: Optional[int] = None,
         skip: int = 0,
         limit: int = 50
     ) -> BitacoraListResponse:
-        query = select(Bitacora)
+        from app.controllers.shared import _es_superadmin, resolve_tenant_id
+        from app.packages.p1_seguridad.models.cu001_tenants.tenant import Tenant
+
+        is_super = _es_superadmin(db, current_user)
+        query = (
+            select(
+                Bitacora,
+                User.email.label("usuario_email"),
+                User.nombrecompleto.label("usuario_nombre"),
+                Tenant.nombre.label("empresa_nombre"),
+                UsuarioTenant.idtenant.label("idtenant")
+            )
+            .outerjoin(UsuarioTenant, Bitacora.idusuariotenant == UsuarioTenant.idusuariotenant)
+            .outerjoin(User, UsuarioTenant.idusuario == User.idusuario)
+            .outerjoin(Tenant, UsuarioTenant.idtenant == Tenant.idtenant)
+        )
+
+        if is_super:
+            if tenant_id and tenant_id != -1:
+                query = query.where(UsuarioTenant.idtenant == tenant_id)
+        else:
+            active_tenant_id = resolve_tenant_id(db, current_user)
+            # Aislamiento multi-tenant estricto: solo eventos del tenant activo
+            query = query.where(UsuarioTenant.idtenant == active_tenant_id)
 
         if accion and accion.strip():
             query = query.where(func.lower(Bitacora.accion) == accion.strip().lower())
@@ -48,12 +73,28 @@ class BitacoraController:
 
         # Orden cronológico inverso (lo más reciente primero)
         query = query.order_by(Bitacora.fechahora.desc()).offset(skip).limit(limit)
-        items = db.execute(query).scalars().all()
+        rows = db.execute(query).all()
 
-        return BitacoraListResponse(
-            total=total,
-            items=[BitacoraResponse.model_validate(b) for b in items]
-        )
+        items = []
+        for row in rows:
+            b = row.Bitacora
+            items.append(
+                BitacoraResponse(
+                    idbitacora=b.idbitacora,
+                    idusuariotenant=b.idusuariotenant,
+                    accion=b.accion,
+                    entidad=b.entidad,
+                    identidad=b.identidad,
+                    ip=b.ip,
+                    fechahora=b.fechahora,
+                    usuario_email=row.usuario_email,
+                    usuario_nombre=row.usuario_nombre,
+                    empresa_nombre=row.empresa_nombre,
+                    idtenant=row.idtenant,
+                )
+            )
+
+        return BitacoraListResponse(total=total, items=items)
 
     # 2. Listar notificaciones del usuario actual
     @staticmethod
@@ -64,14 +105,26 @@ class BitacoraController:
         skip: int = 0,
         limit: int = 50
     ) -> NotificacionListResponse:
-        stmt_ut = select(UsuarioTenant.idusuariotenant).where(
-            UsuarioTenant.idusuario == current_user.idusuario
-        )
-        idut = db.execute(stmt_ut).scalar()
+        from app.controllers.shared import _es_superadmin, resolve_tenant_id
+
+        is_super = _es_superadmin(db, current_user)
+        if is_super:
+            stmt_uts = select(UsuarioTenant.idusuariotenant).where(
+                UsuarioTenant.idusuario == current_user.idusuario
+            )
+        else:
+            active_tenant_id = resolve_tenant_id(db, current_user)
+            stmt_uts = select(UsuarioTenant.idusuariotenant).where(
+                UsuarioTenant.idusuario == current_user.idusuario,
+                UsuarioTenant.idtenant == active_tenant_id
+            )
+        iduts = list(db.execute(stmt_uts).scalars().all())
 
         query = select(Notificacion)
-        if idut:
-            query = query.where(Notificacion.idusuariotenant == idut)
+        if iduts:
+            query = query.where(Notificacion.idusuariotenant.in_(iduts))
+        else:
+            query = query.where(False)
 
         if only_unread:
             query = query.where(Notificacion.leida == False)
@@ -81,8 +134,10 @@ class BitacoraController:
 
         # Cantidad de notificaciones pendientes
         unread_stmt = select(func.count()).where(Notificacion.leida == False)
-        if idut:
-            unread_stmt = unread_stmt.where(Notificacion.idusuariotenant == idut)
+        if iduts:
+            unread_stmt = unread_stmt.where(Notificacion.idusuariotenant.in_(iduts))
+        else:
+            unread_stmt = unread_stmt.where(False)
         unread_count = db.execute(unread_stmt).scalar_one()
 
         query = query.order_by(Notificacion.fechaenvio.desc()).offset(skip).limit(limit)
@@ -134,13 +189,14 @@ AuditController = BitacoraController
 def get_bitacora(
     accion: Optional[str] = Query(None, description="Filtrar por tipo de acción (ej. INSERT, UPDATE, DELETE, LOGIN)"),
     entidad: Optional[str] = Query(None, description="Filtrar por entidad (ej. Venta, Usuario, EventoTrazabilidad)"),
+    tenant_id: Optional[int] = Query(None, description="Filtrar por empresa/tenant (solo SuperAdministrador)"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Consultar bitácora de auditoría."""
-    return BitacoraController.list_bitacora(db, accion, entidad, skip, limit)
+    """Consultar bitácora de auditoría con aislamiento multi-tenant estricto."""
+    return BitacoraController.list_bitacora(db, current_user, accion, entidad, tenant_id, skip, limit)
 
 
 @router.get("/notifications", response_model=NotificacionListResponse)

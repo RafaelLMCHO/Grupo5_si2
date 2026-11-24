@@ -39,7 +39,7 @@
         <button class="btn-secondary" (click)="onSearch()">Buscar</button>
       </div>
       <div class="total-count">
-        Total: <strong>{{ units().length }}</strong> unidades encontradas
+        Total: <strong>{{ total() }}</strong> unidades registradas
       </div>
     </div>
 
@@ -105,6 +105,35 @@
             }
           </tbody>
         </table>
+
+        <!-- Barra de Paginación (Prompt 5) -->
+        @if (total() > 0) {
+          <div class="pagination-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; background: #0f172a; border-top: 1px solid #1e293b; color: #94a3b8; font-size: 0.85rem; flex-wrap: wrap; gap: 0.75rem;">
+            <div>
+              Mostrando <strong style="color: #f8fafc;">{{ startIndex() }} - {{ endIndex() }}</strong> de <strong style="color: #f8fafc;">{{ total() }}</strong> unidades
+            </div>
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+              <label style="display: flex; gap: 0.4rem; align-items: center;">
+                <span>Mostrar:</span>
+                <select [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange(+$event)" style="background: #1e293b; color: #f8fafc; border: 1px solid #334155; border-radius: 4px; padding: 0.25rem 0.5rem; font-size: 0.85rem; cursor: pointer;">
+                  <option [value]="10">10</option>
+                  <option [value]="20">20</option>
+                  <option [value]="50">50</option>
+                  <option [value]="100">100</option>
+                </select>
+              </label>
+              <div style="display: flex; gap: 0.35rem; align-items: center;">
+                <button type="button" (click)="prevPage()" [disabled]="currentPage() === 1" style="background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 0.3rem 0.75rem; border-radius: 4px; cursor: pointer;">
+                  ← Anterior
+                </button>
+                <span style="padding: 0 0.5rem; font-weight: 600; color: #cbd5e1;">Página {{ currentPage() }} de {{ totalPages() }}</span>
+                <button type="button" (click)="nextPage()" [disabled]="currentPage() >= totalPages()" style="background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 0.3rem 0.75rem; border-radius: 4px; cursor: pointer;">
+                  Siguiente →
+                </button>
+              </div>
+            </div>
+          </div>
+        }
       }
     </div>
   </main>

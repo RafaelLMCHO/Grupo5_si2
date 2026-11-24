@@ -14,7 +14,7 @@
 
     <div class="search-bar">
       <input type="text" [ngModel]="uuidInput()" (ngModelChange)="uuidInput.set($event)" (keyup.enter)="consultar()"
-        placeholder="Ingrese el UUID público de la unidad (o escanee el QR)" />
+        placeholder="Buscar por Número de Serie, IMEI o UUID público..." />
       <button class="btn-primary" (click)="consultar()">Consultar</button>
     </div>
 
@@ -59,7 +59,7 @@
             <p class="uuid">Empresa: {{ t.empresa || '—' }} · Estado: {{ t.estado || '—' }}</p>
           </div>
           <span class="auth-badge" [ngClass]="'auth-' + autenticidad()">
-            {{ autenticidad() === 'verificado' ? 'Auténtico' : (autenticidad() === 'registrado' ? 'Registrado' : 'Sin datos') }}
+            {{ autenticidad() === 'verificado' ? 'Auténtico' : (autenticidad() === 'registrado' ? 'Registrado' : 'Sin eventos') }}
           </span>
         </div>
 
@@ -91,7 +91,7 @@
               </div>
             </div>
           } @empty {
-            <p class="empty">La unidad aún no tiene eventos de trazabilidad registrados.</p>
+            <p class="empty">Sin eventos de trazabilidad registrados para esta unidad.</p>
           }
         </div>
 

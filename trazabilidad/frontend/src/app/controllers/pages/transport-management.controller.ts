@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { TransportService } from '../services/transport.service';
 import { LocationService } from '../services/location.service';
 import { ActorService } from '../services/actor.service';
+import { AuthService } from '../services/auth.service';
 import { EnvioItem, EnvioTimelineResponse, CreateTransportEventPayload, EnvioCreate, EnvioDetalle, EnvioUnidadesResponse, EnvioUnidadCandidateItem } from '../../models/transport.model';
 import { LocationItem, Actor } from '../../models/auth.models';
 
@@ -19,6 +20,12 @@ export class TransportManagementController implements OnInit {
   private transportService = inject(TransportService);
   private locationService = inject(LocationService);
   private actorService = inject(ActorService);
+  private authService = inject(AuthService);
+
+  canManageShipments(): boolean {
+    const roles = this.authService.currentUser()?.roles || [];
+    return roles.includes('SuperAdministrador') || roles.includes('AdministradorEmpresa') || roles.includes('GestorOperaciones');
+  }
 
   shipments = this.transportService.shipmentsSignal;
   isLoading = this.transportService.loadingSignal;

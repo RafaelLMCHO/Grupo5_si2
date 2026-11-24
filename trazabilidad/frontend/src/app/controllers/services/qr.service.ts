@@ -1,6 +1,6 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { Observable, tap, map } from 'rxjs';
 import { UnitQrItem, GenerateQRResult, BulkQRResponse } from '../../models/qr.model';
 import { environment } from '../../../environments/environment';
 
@@ -12,6 +12,7 @@ export class QrService {
   private apiUrl = `${environment.apiUrl}/qr`;
 
   unitsSignal = signal<UnitQrItem[]>([]);
+  totalSignal = signal<number>(0);
   loadingSignal = signal<boolean>(false);
 
   getUnits(tieneQr?: boolean, search: string = '', skip: number = 0, limit: number = 50): Observable<UnitQrItem[]> {
@@ -27,14 +28,21 @@ export class QrService {
       params = params.set('search', search);
     }
 
-    return this.http.get<UnitQrItem[]>(`${this.apiUrl}/units`, { params }).pipe(
+    return this.http.get<UnitQrItem[]>(`${this.apiUrl}/units`, { params, observe: 'response' }).pipe(
       tap({
         next: (res) => {
-          this.unitsSignal.set(res);
+          this.unitsSignal.set(res.body || []);
+          const totalHeader = res.headers.get('X-Total-Count');
+          if (totalHeader) {
+            this.totalSignal.set(parseInt(totalHeader, 10));
+          } else {
+            this.totalSignal.set(res.body?.length || 0);
+          }
           this.loadingSignal.set(false);
         },
         error: () => this.loadingSignal.set(false)
-      })
+      }),
+      map(res => res.body || [])
     );
   }
 

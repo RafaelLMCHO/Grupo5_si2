@@ -81,17 +81,7 @@ export class TraceabilityController implements OnInit {
   verCertificado(): void {
     const uuid = this.trace()?.uuidpublico;
     if (!uuid) return;
-    this.isLoadingCert.set(true);
-    this.certificateService.getPublicCertificate(uuid).subscribe({
-      next: (res) => {
-        this.certificate.set(res);
-        this.isLoadingCert.set(false);
-      },
-      error: (err) => {
-        this.isLoadingCert.set(false);
-        this.errorMessage.set(err?.error?.detail || 'No se pudo cargar el certificado.');
-      }
-    });
+    window.open(`/trace/${uuid}`, '_blank');
   }
 
   autenticidad(): 'verificado' | 'registrado' | 'sin_datos' {

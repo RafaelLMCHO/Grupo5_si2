@@ -29,8 +29,12 @@ ROLES_GESTION_UNIDAD = ("AdministradorEmpresa", "GestorOperaciones")
 # (units:update: devoluciones, garantías y venta de unidades).
 ROLES_EDICION_UNIDAD = ROLES_GESTION_UNIDAD + ("GestorVentasPostventa",)
 
+# Roles autorizados para consultar unidades (incluye Auditor para solo lectura)
+ROLES_CONSULTA_UNIDAD = ROLES_EDICION_UNIDAD + ("Auditor",)
+
 requires_gestion_unidad = require_roles(*ROLES_GESTION_UNIDAD)
 requires_edicion_unidad = require_roles(*ROLES_EDICION_UNIDAD)
+requires_consulta_unidad = require_roles(*ROLES_CONSULTA_UNIDAD)
 
 
 class UnitController:
@@ -238,7 +242,7 @@ def get_units(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(requires_gestion_unidad)
+    current_user: User = Depends(requires_consulta_unidad)
 ):
     """Listar unidades físicas registradas (Serial/IMEI) (CU-015)."""
     return UnitController.list_units(db, current_user, search, estado, idvariante, skip, limit)

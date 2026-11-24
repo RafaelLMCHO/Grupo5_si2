@@ -3,12 +3,78 @@
 > **Documento:** Pase de Posta Inmediato entre Sesiones de Agentes de IA  
 > **Ubicación:** `docs/ai/HANDOFF_LATEST.md`  
 > **Fecha / Sesión:** 2026-11-24  
-> **Sprint Activo:** Sprint 5 (Seguridad, Hardening, Auditoría y Robusteza Multi-Tenant)  
-> **Estado Técnico:** **Despliegue Completo en la Nube: Backend en Railway `sprint#4` (`https://sprint4-production.up.railway.app`) | Frontend Web en Vercel (`https://frontend-sepia-seven-97.vercel.app` y `https://frontend-hbvjomrpq-sistemas26.vercel.app` públicos) | Base de Datos en Supabase Cloud (38,386 filas) | APK Release Generado (`app-release.apk`, 70.0MB) con soporte Consumidor y Voz | Repositorio https://github.com/RafaelLMCHO/Grupo5_si2.git sincronizado en rama `Rafael`**
+> **Sprint Activo:** Hardening de Seguridad, Aislamiento Multi-Tenant y RBAC (Prioridad 0)  
+> **Estado Técnico:** **Despliegue Completo en Producción: Backend en Railway `sprint#4` (`https://sprint4-production.up.railway.app`) | Frontend Web en Vercel (`https://grupo5-trazabilidad.vercel.app` público) | Base de Datos en Supabase Cloud | 32/32 Tests Unitarios/Integración Verdes | Repositorio https://github.com/RafaelLMCHO/Grupo5_si2.git sincronizado en rama `Rafael`**
 
 ---
 
-## 0. Sesión actual (2026-11-24): Generación de APK Móvil, Desbloqueo Vercel y Soporte CU-028 Consumidor
+## 0. Sesión actual (2026-11-24): Implementación Integral de Prioridad 0 (Seguridad, Aislamiento Multi-Tenant y RBAC)
+
+**Petición del Usuario:**
+"ahora implementa la prioridad 0" (siguiendo las directrices canónicas de `prompts_correcciones_grupo5.txt`):
+* **Prompt 1 (Bitácora & Notificaciones CU-005):** Filtrado estricto por tenant en backend; agregar columnas Usuario (email) y Empresa; sólo SuperAdmin ve todas las empresas o filtra por tenant.
+* **Prompt 2 (Usuarios & Roles CU-002, CU-003):** Filtrado estricto por tenant en backend; 403/404 ante operaciones cross-tenant; ocultar selector de empresas para no-SuperAdmin; proteger filas de usuarios privilegiados.
+* **Prompt 3 (RBAC & Permisos):** Mutación de documentos restringida a SuperAdmin, AdminEmpresa y GestorOperaciones (Ventas/Postventa solo consulta y verifica); Auditor con acceso de solo lectura limpio a Unidades, QR, Envíos, Documentos, Catálogo Empresa y Certificados sin botones de acción; suprimir "Total: 0" ante mensajes de error.
+
+### 1. Acciones Realizadas y Cambios en Backend y Frontend
+
+1. **Prompt 1 - Bitácora y Notificaciones (CU-005):**
+   * `backend/.../bitacora_views.py`: Se extendió `BitacoraResponse` agregando `usuario_email: Optional[str]`, `usuario_nombre: Optional[str]`, `empresa_nombre: Optional[str]` e `idtenant: Optional[int]`.
+   * `backend/.../bitacora_controller.py`:
+     * `list_bitacora`: Aplica filtro estricto por `UsuarioTenant.idtenant == active_tenant_id` para usuarios que no sean SuperAdministrador. Para SuperAdministrador, permite ver todas las empresas o filtrar por el parámetro `tenant_id`. Se realizan joins con `User` y `Tenant` para poblar el email del actor y la razón social de la empresa.
+     * `list_notifications`: Restringe las notificaciones estrictamente al `idusuario` del `current_user` y sus vínculos en la empresa activa.
+     * Endpoint `@router.get("/bitacora")`: Asegura la inyección de `current_user: User = Depends(get_current_user)` y el query param `tenant_id: Optional[int] = None`.
+   * `frontend/.../auth.models.ts`: Se actualizaron las interfaces `BitacoraItem` y `BitacoraResponse`.
+   * `frontend/.../audit-notification.view.html`: Se agregaron las columnas `Usuario` (email del actor) y `Empresa` en la tabla de bitácora.
+
+2. **Prompt 2 - Gestión de Usuarios y Asignación de Roles (CU-002, CU-003):**
+   * `backend/.../user_controller.py`:
+     * `list_users`: Filtra rigurosamente por `UsuarioTenant.idtenant == active_tenant_id`. Excluye usuarios SuperAdministrador de los listados de tenants estándar y excluye al usuario raíz plataforma (ID 1, `admin@trazabilidad.com`) de empresas ajenas a iStore Bolivia.
+     * `_build_user_response`: Acepta `tenant_id: Optional[int] = None` para evitar asignar la empresa incorrecta en usuarios con múltiples vínculos históricos.
+   * `backend/.../role_controller.py`:
+     * `get_user_roles`: Retorna `404 Not Found` si un usuario no-SuperAdmin intenta consultar roles de un SuperAdmin o de un usuario que no pertenece a su tenant activo.
+     * `assign_user_roles`: Retorna `403 Forbidden` si un `AdministradorEmpresa` intenta asignar el rol `SuperAdministrador` o si intenta mutar roles de un SuperAdmin o usuario cross-tenant.
+   * `frontend/.../user-management.controller.ts`:
+     * Incorporación de métodos reactivos `isSuperAdmin()` y `canModifyUser(user)`.
+   * `frontend/.../user-management.view.html`:
+     * El selector de empresas `<select>` se oculta condicionalmente con `@if (isSuperAdmin() && tenants().length > 0)`.
+     * Las filas de usuarios protegidos (SuperAdministrador o usuarios fuera de la empresa) ocultan los botones de Editar/Eliminar y muestran un badge `"Protegido"`.
+
+3. **Prompt 3 - Gobernanza RBAC y Auditoría:**
+   * `backend/.../document_controller.py`:
+     * Se crearon las tuplas canónicas de roles:
+       `ROLES_MUTACION_DOCUMENTOS = ("SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones")`
+       `ROLES_CONSULTA_DOCUMENTOS = ("SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones", "GestorVentasPostventa", "Auditor")`
+     * Endpoints de mutación (`POST /units/{idunidad}`, `DELETE /{iddocumento}`) protegidos estrictamente con `requires_mutacion_documentos`.
+   * `backend/.../unit_controller.py`: Se habilitó al rol `Auditor` para consultar `GET /units` (`ROLES_CONSULTA_UNIDAD`).
+   * `backend/.../qr_controller.py`: Se habilitó al rol `Auditor` para consultar `GET /qr/units` (`ROLES_CONSULTA_QR`).
+   * `backend/.../shipment_controller.py`: Se habilitó al rol `Auditor` para consultar `GET /shipments` y `GET /shipments/{idenvio}`.
+   * `frontend/.../app.routes.ts`: Se otorgaron permisos de ruta para `Auditor` en `qr-codes`, `tenant-catalog` y `documents`, y para `GestorOperaciones` en `documents`.
+   * `frontend/.../dashboard.controller.ts`: Se sincronizó el acceso rápido al menú de documentos.
+   * `frontend/.../document-management.controller.ts` & `view.html`: Se inyectó `AuthService` y se creó `canManageDocs()`, ocultando `+ Adjuntar Documento` y `Eliminar` para `Auditor` y `GestorVentasPostventa`.
+   * `frontend/.../unit-management.controller.ts` & `view.html`: Se ocultaron botones de mutación para `Auditor`.
+   * `frontend/.../transport-management.controller.ts` & `view.html`: Se ocultaron acciones de creación, transición de estado y registro de hitos logísticos para `Auditor`.
+   * Supresión de mensajes `"Total: 0"` o listas vacías redundantes cuando existe un mensaje de error activo en pantalla.
+
+4. **Validaciones y Pruebas Unitarias:**
+   * Suite ejecutada contra Supabase Cloud (`aws-0-us-west-2.pooler.supabase.com`):
+     * `test_audit.py`: 3 passed (100%)
+     * `test_users.py`: 10 passed (100%)
+     * `test_roles.py`: 5 passed (100%)
+     * `test_rbac.py`: 5 passed (100%)
+     * `test_documents_cu032.py`: 9 passed (100%)
+     * **Resultado Total: 32 PASSED | 0 FAILED | 0 ERRORS**
+   * Compilación exitosa de Frontend Angular (`ng build` -> Initial total 1.07 MB).
+
+5. **Despliegues en la Nube:**
+   * **Backend Railway:** Desplegado mediante `railway up --service sprint#4` hacia `https://sprint4-production.up.railway.app`.
+   * **Frontend Vercel:** Desplegado en producción con alias público canónico limpio:
+     **`https://grupo5-trazabilidad.vercel.app`** (HTTP 200 sin intercepción de equipo).
+
+6. **Control de Versiones (Git):**
+   * Commit y push ejecutados a `https://github.com/RafaelLMCHO/Grupo5_si2.git` en la rama `Rafael`.
+
+---
 
 **Petición del Usuario:**
 1. Desbloquear enlaces individuales de Vercel para acceso público sin login de equipo (SSO).

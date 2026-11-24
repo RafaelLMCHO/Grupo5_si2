@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -6,6 +6,7 @@ import { UnitService } from '../services/unit.service';
 import { ProductService } from '../services/product.service';
 import { ActorService } from '../services/actor.service';
 import { LocationService } from '../services/location.service';
+import { AuthService } from '../services/auth.service';
 import { UnitItem, UnitCreate, Variant, Product } from '../../models/auth.models';
 
 @Component({
@@ -20,6 +21,7 @@ export class UnitManagementController implements OnInit {
   private productService = inject(ProductService);
   private actorService = inject(ActorService);
   private locationService = inject(LocationService);
+  private authService = inject(AuthService);
 
   units = this.unitService.unitsSignal;
   isLoading = this.unitService.loadingSignal;
@@ -32,6 +34,20 @@ export class UnitManagementController implements OnInit {
 
   searchQuery = signal<string>('');
   selectedEstado = signal<string>('');
+
+  currentPage = signal<number>(1);
+  pageSize = signal<number>(20);
+
+  totalPages = computed(() => Math.ceil((this.total() || 0) / this.pageSize()) || 1);
+  startIndex = computed(() => {
+    const t = this.total() || 0;
+    if (t === 0) return 0;
+    return (this.currentPage() - 1) * this.pageSize() + 1;
+  });
+  endIndex = computed(() => {
+    const t = this.total() || 0;
+    return Math.min(this.currentPage() * this.pageSize(), t);
+  });
 
   isModalOpen = signal<boolean>(false);
   isEditMode = signal<boolean>(false);
@@ -63,13 +79,24 @@ export class UnitManagementController implements OnInit {
     return Number(val);
   }
 
+  canManageUnits(): boolean {
+    const roles = this.authService.currentUser()?.roles || [];
+    return roles.includes('SuperAdministrador') || roles.includes('AdministradorEmpresa') || roles.includes('GestorOperaciones');
+  }
+
+  canEditUnits(): boolean {
+    const roles = this.authService.currentUser()?.roles || [];
+    return roles.includes('SuperAdministrador') || roles.includes('AdministradorEmpresa') || roles.includes('GestorOperaciones') || roles.includes('GestorVentasPostventa');
+  }
+
   ngOnInit() {
     this.loadUnits();
     this.loadDropdownData();
   }
 
   loadUnits() {
-    this.unitService.getUnits(this.searchQuery(), this.selectedEstado()).subscribe({
+    const skip = (this.currentPage() - 1) * this.pageSize();
+    this.unitService.getUnits(this.searchQuery(), this.selectedEstado(), undefined, skip, this.pageSize()).subscribe({
       error: (err) => this.errorMessage.set(err?.error?.detail || 'Error cargando unidades.')
     });
   }
@@ -96,7 +123,28 @@ export class UnitManagementController implements OnInit {
     });
   }
 
+  nextPage(): void {
+    if (this.currentPage() < this.totalPages()) {
+      this.currentPage.update(p => p + 1);
+      this.loadUnits();
+    }
+  }
+
+  prevPage(): void {
+    if (this.currentPage() > 1) {
+      this.currentPage.update(p => p - 1);
+      this.loadUnits();
+    }
+  }
+
+  onPageSizeChange(size: number): void {
+    this.pageSize.set(size);
+    this.currentPage.set(1);
+    this.loadUnits();
+  }
+
   onSearch() {
+    this.currentPage.set(1);
     this.loadUnits();
   }
 

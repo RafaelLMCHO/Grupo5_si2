@@ -42,10 +42,12 @@ def _require_gestion_or_auditor(
 
 class UserController:
     @staticmethod
-    def _build_user_response(db: Session, user: User) -> UserResponse:
+    def _build_user_response(db: Session, user: User, tenant_id: Optional[int] = None) -> UserResponse:
         stmt_t = select(Tenant).join(
             UsuarioTenant, UsuarioTenant.idtenant == Tenant.idtenant
         ).where(UsuarioTenant.idusuario == user.idusuario)
+        if tenant_id:
+            stmt_t = stmt_t.where(UsuarioTenant.idtenant == tenant_id)
         tenant = db.execute(stmt_t).scalars().first()
 
         return UserResponse(
@@ -74,11 +76,14 @@ class UserController:
         # Aislamiento multi-tenant:
         # SuperAdministrador puede filtrar por empresa o ver todo.
         # Demás roles: OBLIGATORIAMENTE su empresa activa.
+        target_tid = None
         if is_super:
             if tenant_id and tenant_id != -1:
+                target_tid = tenant_id
                 query = query.join(UsuarioTenant, UsuarioTenant.idusuario == User.idusuario).where(UsuarioTenant.idtenant == tenant_id)
         else:
             active_tenant_id = resolve_tenant_id(db, current_user)
+            target_tid = active_tenant_id
             query = query.join(UsuarioTenant, UsuarioTenant.idusuario == User.idusuario).where(UsuarioTenant.idtenant == active_tenant_id)
             # Administrador de empresa u otros roles no deben ver a los SuperAdministradores en su lista
             stmt_super_users = (
@@ -88,6 +93,9 @@ class UserController:
                 .where(Role.nombrerol == "SuperAdministrador")
             )
             query = query.where(~User.idusuario.in_(stmt_super_users))
+            # Si el tenant activo no es iStore (tenant 1), excluir al usuario 1 (admin de plataforma)
+            if active_tenant_id != 1:
+                query = query.where(User.idusuario != 1)
 
         if search and search.strip():
             term = f"%{search.strip().lower()}%"
@@ -106,7 +114,7 @@ class UserController:
         query = query.order_by(User.idusuario.asc()).offset(skip).limit(limit)
         users = db.execute(query).scalars().all()
 
-        result_items = [UserController._build_user_response(db, u) for u in users]
+        result_items = [UserController._build_user_response(db, u, target_tid) for u in users]
 
         return UserListResponse(total=total, items=result_items)
 

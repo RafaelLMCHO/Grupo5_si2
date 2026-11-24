@@ -40,8 +40,17 @@ from app.views.cu032_documentos_unidad.document_views import (
 
 router = APIRouter(prefix="/documents", tags=["Documentos de Unidad (CU-032)"])
 
-ROLES_DOCUMENTOS = ("AdministradorEmpresa", "GestorVentasPostventa")
-requires_documentos = require_roles(*ROLES_DOCUMENTOS)
+ROLES_MUTACION_DOCUMENTOS = ("SuperAdministrador", "AdministradorEmpresa", "GestorOperaciones")
+ROLES_CONSULTA_DOCUMENTOS = (
+    "SuperAdministrador",
+    "AdministradorEmpresa",
+    "GestorOperaciones",
+    "GestorVentasPostventa",
+    "Auditor",
+)
+
+requires_mutacion_documentos = require_roles(*ROLES_MUTACION_DOCUMENTOS)
+requires_documentos = require_roles(*ROLES_CONSULTA_DOCUMENTOS)
 
 _TIPOS_VALIDOS = set(TIPO_DOCUMENTO_ENUM.enums)
 
@@ -292,7 +301,7 @@ def attach_document_route(
     body: CreateDocumentoRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(requires_documentos),
+    current_user: User = Depends(requires_mutacion_documentos),
 ):
     """T049 - Adjuntar un documento a una unidad (CU-032)."""
     return DocumentoController.attach_document(db, current_user, request, idunidad, body)
@@ -347,7 +356,7 @@ def delete_document_route(
     iddocumento: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(requires_documentos),
+    current_user: User = Depends(requires_mutacion_documentos),
 ):
     """Eliminar un documento de una unidad (CU-032)."""
     DocumentoController.delete_document(db, current_user, request, iddocumento)

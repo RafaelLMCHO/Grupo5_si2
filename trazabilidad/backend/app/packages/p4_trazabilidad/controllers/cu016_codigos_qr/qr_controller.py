@@ -29,8 +29,10 @@ router = APIRouter(prefix="/qr", tags=["Generación y Descarga de Código QR (CU
 
 # Roles autorizados a generar tokens QR (qr:generate en la matriz rol-permisos).
 ROLES_GENERACION_QR = ("AdministradorEmpresa", "GestorOperaciones")
+ROLES_CONSULTA_QR = ROLES_GENERACION_QR + ("GestorVentasPostventa", "Auditor")
 
 requires_generacion_qr = require_roles(*ROLES_GENERACION_QR)
+requires_consulta_qr = require_roles(*ROLES_CONSULTA_QR)
 
 
 def _get_bolivia_now() -> datetime:
@@ -104,6 +106,9 @@ class QRController:
                 )
             )
 
+        count_stmt = select(func.count()).select_from(query.subquery())
+        total = db.execute(count_stmt).scalar_one()
+
         query = query.order_by(UnidadProducto.idunidad.desc()).offset(skip).limit(limit)
         rows = db.execute(query).all()
 
@@ -133,7 +138,7 @@ class QRController:
                 )
             )
 
-        return results
+        return results, total
 
     @staticmethod
     def generate_qr(
@@ -301,15 +306,18 @@ class QRController:
 # Rutas FastAPI
 @router.get("/units", response_model=List[UnitQrInfoResponse])
 def list_units_route(
+    response: Response,
     tiene_qr: Optional[bool] = Query(None, description="Filtrar por si tiene QR (true/false)"),
     search: Optional[str] = Query(None, description="Buscar por número de serie, IMEI, modelo"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(requires_generacion_qr)
+    current_user: User = Depends(requires_consulta_qr)
 ):
     """Listar unidades físicas para generación o consulta de Código QR (CU-016)."""
-    return QRController.list_units(db, current_user, tiene_qr, search, skip, limit)
+    items, total = QRController.list_units(db, current_user, tiene_qr, search, skip, limit)
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/generate/{idunidad}", response_model=GenerateQRResponse)

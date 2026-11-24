@@ -5,7 +5,7 @@
       <span class="brand-name">Gestión de Usuarios del Sistema</span>
     </div>
     <div class="nav-actions" style="display: flex; gap: 0.5rem; align-items: center;">
-      @if (tenants().length > 0) {
+      @if (isSuperAdmin() && tenants().length > 0) {
         <select 
           [value]="currentUser()?.tenant?.idtenant" 
           (change)="onTenantSwitch($event)"
@@ -107,12 +107,16 @@
                   </span>
                 </td>
                 <td class="actions-cell">
-                  <button class="btn-icon edit" (click)="openEditModal(user)" title="Editar">
-                    ✏️
-                  </button>
-                  <button class="btn-icon delete" (click)="onDelete(user)" title="Desactivar">
-                    🗑️
-                  </button>
+                  @if (canModifyUser(user)) {
+                    <button class="btn-icon edit" (click)="openEditModal(user)" title="Editar">
+                      ✏️
+                    </button>
+                    <button class="btn-icon delete" (click)="onDelete(user)" title="Desactivar">
+                      🗑️
+                    </button>
+                  } @else {
+                    <span style="font-size: 0.75rem; color: #64748b; font-weight: 500;">Protegido</span>
+                  }
                 </td>
               </tr>
             } @empty {

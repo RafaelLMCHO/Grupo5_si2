@@ -12,6 +12,10 @@ class BitacoraResponse(BaseModel):
     identidad: Optional[int] = None
     ip: Optional[str] = None
     fechahora: datetime
+    usuario_email: Optional[str] = None
+    usuario_nombre: Optional[str] = None
+    empresa_nombre: Optional[str] = None
+    idtenant: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 

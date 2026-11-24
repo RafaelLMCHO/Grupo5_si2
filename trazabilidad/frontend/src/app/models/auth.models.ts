@@ -106,6 +106,10 @@ export interface BitacoraItem {
   identidad?: number;
   ip?: string;
   fechahora: string;
+  usuario_email?: string;
+  usuario_nombre?: string;
+  empresa_nombre?: string;
+  idtenant?: number;
 }
 
 export interface BitacoraListResponse {

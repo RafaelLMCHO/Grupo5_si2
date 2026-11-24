@@ -174,7 +174,9 @@ export class DashboardController implements OnInit {
       case 'documents':
         return (
           roles.includes('AdministradorEmpresa') ||
-          roles.includes('GestorVentasPostventa')
+          roles.includes('GestorOperaciones') ||
+          roles.includes('GestorVentasPostventa') ||
+          roles.includes('Auditor')
         );
 
       case 'certificates':

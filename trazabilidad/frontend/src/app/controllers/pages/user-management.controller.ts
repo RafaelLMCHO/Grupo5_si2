@@ -48,6 +48,18 @@ export class UserManagementController implements OnInit {
     this.tenantService.getTenants().subscribe();
   }
 
+  isSuperAdmin(): boolean {
+    return this.authService.hasRole('SuperAdministrador');
+  }
+
+  canModifyUser(user: User): boolean {
+    if (this.isSuperAdmin()) return true;
+    if (user.email === 'superadmin@trazabilidad.com' || user.email === 'admin@trazabilidad.com') {
+      return false;
+    }
+    return true;
+  }
+
   loadUsers(): void {
     this.userService.getUsers(this.searchQuery(), this.selectedTenantFilter() || undefined).subscribe({
       error: (err) => {

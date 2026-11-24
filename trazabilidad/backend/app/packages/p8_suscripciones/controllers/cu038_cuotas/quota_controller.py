@@ -3,13 +3,15 @@ from datetime import datetime
 from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, update, func
 from sqlalchemy.orm import Session
 
 from app.controllers.cu004_autenticacion.auth_controller import get_current_user
 from app.controllers.shared import get_bolivia_now, require_roles, resolve_tenant_id
 from app.db.session import get_db
 from app.models.cu002_usuarios.user import User
+from app.models.cu002_usuarios.usuario_tenant import UsuarioTenant
+from app.models.cu015_unidades_producto.unit import UnidadProducto
 from app.packages.p8_suscripciones.models.cu036_planes.subscription_models import Plan, Suscripcion
 from app.packages.p8_suscripciones.models.cu038_cuotas.uso_plan import UsoPlan
 from app.packages.p8_suscripciones.views.cu038_cuotas.quota_views import (
@@ -32,6 +34,21 @@ _LIMITES_PLAN = {
 
 def _suscripcion_activa(db: Session, tenant_id: int):
     ahora = get_bolivia_now()
+    # Auto-expirar suscripciones vencidas (Prompt 6)
+    try:
+        db.execute(
+            update(Suscripcion)
+            .where(
+                Suscripcion.idtenant == tenant_id,
+                Suscripcion.fechafin < ahora,
+                Suscripcion.estado.in_(["trial", "activa"]),
+            )
+            .values(estado="vencida")
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+
     return db.execute(
         select(Suscripcion)
         .where(
@@ -61,9 +78,27 @@ def _armar_response(db: Session, tenant_id: int) -> CuotaResponse:
     plan = db.execute(
         select(Plan).where(Plan.idplan == suscripcion.idplan)
     ).scalar_one_or_none() if suscripcion else None
-    uso = db.execute(
-        select(UsoPlan).where(UsoPlan.idtenant == tenant_id, UsoPlan.periodo == periodo)
-    ).scalar_one_or_none()
+
+    # Contadores reales del tenant (Prompt 6)
+    usuarios_reales = db.execute(
+        select(func.count(User.idusuario))
+        .join(UsuarioTenant, UsuarioTenant.idusuario == User.idusuario)
+        .where(UsuarioTenant.idtenant == tenant_id, User.activo == True)
+    ).scalar() or 0
+
+    unidades_reales = db.execute(
+        select(func.count(UnidadProducto.idunidad))
+        .where(UnidadProducto.idtenant == tenant_id)
+    ).scalar() or 0
+
+    uso = _uso_actual(db, tenant_id, periodo)
+    uso.usuariosactivos = usuarios_reales
+    uso.unidadesregistradas = unidades_reales
+    uso.actualizadoen = get_bolivia_now()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
 
     limites: Dict[str, LimiteItem] = {}
     for concepto in CONCEPTOS:
@@ -80,8 +115,8 @@ def _armar_response(db: Session, tenant_id: int) -> CuotaResponse:
     return CuotaResponse(
         idtenant=tenant_id,
         periodo=periodo,
-        plan=plan.nombre if plan else None,
-        estado_suscripcion=str(suscripcion.estado) if suscripcion else None,
+        plan=plan.nombre if plan else "Sin Plan Activo",
+        estado_suscripcion=str(suscripcion.estado) if suscripcion else "vencida",
         limites=limites,
         actualizadoen=uso.actualizadoen if uso else None,
     )

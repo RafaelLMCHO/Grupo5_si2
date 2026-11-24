@@ -2,24 +2,24 @@
 
 > **Documento:** Snapshot Técnico y Contexto Operativo para Agentes de IA  
 > **Ubicación:** `docs/ai/CURRENT_STATE.md`  
-> **Última Actualización:** 2026-11-23 (Despliegue de Producción en Railway bajo el proyecto independiente `sprint#4` [`https://sprint4-production.up.railway.app`]; Conexión completa a la base de datos de producción en Supabase Cloud con 38,386 filas; Verificación operativa de login, unidades y asistente IA; Clientes Frontend y Mobile apuntados a producción)  
-> **Branch Principal:** `main` (o rama de desarrollo activa)
+> **Última Actualización:** 2026-11-24 (Implementación y Despliegue de Prioridad 0: Seguridad, Aislamiento Multi-Tenant y RBAC; 32 tests de seguridad y aislamiento 100% verdes contra Supabase; Frontend en Vercel [`https://grupo5-trazabilidad.vercel.app`]; Backend en Railway [`https://sprint4-production.up.railway.app`])  
+> **Branch Principal:** `Rafael` (Repositorio `https://github.com/RafaelLMCHO/Grupo5_si2.git`)
 
 ---
 
 ## 1. Resumen Ejecutivo de la Base de Código
 
-* **Estado de la Suite de Pruebas:** **252 PASSED | 0 FAILED | 0 ERRORS** (100% verde en PostgreSQL; 69 tests específicos de seguridad, integridad, rate limiting, migraciones, auditoría, consultas inteligentes de voz y gráficos vectoriales en `test_ai_voice_new_queries.py`, `test_ai_voice_query_customization.py`, etc.).
-* **Base de Datos:** PostgreSQL local `Blockchain` (misma instancia que usan la app y los tests); migraciones aplicadas hasta `c7d8e9f0a1b2` (Stripe, pago único). No existe una BD `blacktest` configurada en el código.
+* **Estado de la Suite de Pruebas:** **32 PASSED | 0 FAILED | 0 ERRORS** verificados específicamente en los módulos de seguridad, usuarios, roles, RBAC y documentos contra Supabase Cloud (`test_audit.py`, `test_users.py`, `test_roles.py`, `test_rbac.py`, `test_documents_cu032.py`).
+* **Base de Datos:** PostgreSQL en Supabase Cloud (`aws-0-us-west-2.pooler.supabase.com`) con 38,386 filas migradas y operando en Railway `sprint#4`.
 * **Empaquetado Modular (ADR-003 + ADR-008):**
-  * **P1** `app/packages/p1_seguridad/` — CU-001 a CU-005 (incluye hardening en `/tenants` CU-001, hardening en `/users` CU-002, hardening RBAC en CU-003 y el push de CU-005 en `/notifications/push`).
-  * **P2** `app/packages/p2_catalogo/` — CU-006 a CU-012 (incluye hardening en `/products` y `/variants` CU-006, y `/certifications` CU-007 con retorno 409).
-  * **P3** `app/packages/p3_actores/` — CU-013, CU-014 (aislamiento `resolve_tenant_id`).
-  * **P4** `app/packages/p4_trazabilidad/` — CU-015 a CU-024 (aislamiento `resolve_tenant_id` y validación de pertenencia 422 en unidades).
-  * **P5** `app/packages/p5_comercial/` — CU-025 a CU-032.
+  * **P1** `app/packages/p1_seguridad/` — CU-001 a CU-005 (Filtro multi-tenant estricto en `/bitacora` y `/notifications`, columnas Usuario y Empresa; Aislamiento estricto en `/users` y `/roles`, exclusión de usuarios de otros tenants y SuperAdmin para administradores locales, prevención de escalada de privilegios y protección de filas sensibles).
+  * **P2** `app/packages/p2_catalogo/` — CU-006 a CU-012.
+  * **P3** `app/packages/p3_actores/` — CU-013, CU-014.
+  * **P4** `app/packages/p4_trazabilidad/` — CU-015 a CU-024 (Rol `Auditor` con lectura de solo consulta habilitada en `/units`, `/qr/units` y `/shipments`).
+  * **P5** `app/packages/p5_comercial/` — CU-025 a CU-032 (`/documents` protegido: mutación reservada a `SuperAdministrador`, `AdministradorEmpresa` y `GestorOperaciones`; `Auditor` y `GestorVentasPostventa` con solo lectura).
   * **P6** `app/packages/p6_blockchain/` — CU-033, CU-034.
-  * **P7** `app/packages/p7_reportes/` — CU-035 (reportes, dashboard y PDF).
-  * **P8** `app/packages/p8_suscripciones/` — CU-036 a CU-040 (creado en Sprint 4; CU-036/037 migrados desde P1 con shims retrocompatibles).
+  * **P7** `app/packages/p7_reportes/` — CU-035.
+  * **P8** `app/packages/p8_suscripciones/` — CU-036 a CU-040.
 * **Consolidación en `main.py`:** exactamente **8 inclusiones canónicas** de paquete con prefijo `/api/v1` (~174 rutas registradas).
 * **Sprints Completados:** S0, S1, S2, S3 y S4 (backend + web + móvil de los CUs del sprint).
 * **UI Web (Angular 21):** compila con `npm run build` (styles y plantillas sin errores).

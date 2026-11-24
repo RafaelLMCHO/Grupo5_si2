@@ -24,7 +24,7 @@
         @for (e of entries(q.limites); track e.key) {
           <div class="card">
             <div class="card-head">
-              <strong>{{ e.key }}</strong>
+              <strong>{{ formatConcepto(e.key) }}</strong>
               <span class="badge" [ngClass]="e.value.excedido ? 'estado-rechazada' : 'estado-pagada'">
                 {{ e.value.excedido ? 'Excedido' : 'Disponible' }}
               </span>

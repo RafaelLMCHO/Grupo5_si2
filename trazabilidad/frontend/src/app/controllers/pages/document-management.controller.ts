@@ -1,9 +1,10 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DocumentService } from '../services/document.service';
 import { UnitService } from '../services/unit.service';
+import { AuthService } from '../services/auth.service';
 import { CreateDocumentoRequest, Documento, VerifyDocumentoResponse } from '../../models/document.model';
 
 @Component({
@@ -16,6 +17,7 @@ import { CreateDocumentoRequest, Documento, VerifyDocumentoResponse } from '../.
 export class DocumentManagementController implements OnInit {
   private documentService = inject(DocumentService);
   private unitService = inject(UnitService);
+  private authService = inject(AuthService);
   private route = inject(ActivatedRoute);
 
   documents = this.documentService.documentsSignal;
@@ -25,6 +27,39 @@ export class DocumentManagementController implements OnInit {
 
   selectedTipo = signal<string>('');
   selectedUnidad = signal<number | null>(null);
+
+  currentPage = signal<number>(1);
+  pageSize = signal<number>(20);
+
+  totalPages = computed(() => Math.ceil((this.total() || 0) / this.pageSize()) || 1);
+  startIndex = computed(() => {
+    const t = this.total() || 0;
+    if (t === 0) return 0;
+    return (this.currentPage() - 1) * this.pageSize() + 1;
+  });
+  endIndex = computed(() => {
+    const t = this.total() || 0;
+    return Math.min(this.currentPage() * this.pageSize(), t);
+  });
+
+  unitSearch = signal<string>('');
+  filteredUnits = computed(() => {
+    const q = this.unitSearch().trim().toLowerCase();
+    const list = this.units();
+    if (!q) return list.slice(0, 50);
+    return list.filter(u => 
+      u.numeroserie.toLowerCase().includes(q) || 
+      (u.imei1 && u.imei1.includes(q)) ||
+      (u.variante?.sku && u.variante.sku.toLowerCase().includes(q))
+    ).slice(0, 50);
+  });
+
+  onUnitSearch(query: string): void {
+    this.unitSearch.set(query);
+    if (query.trim().length >= 2) {
+      this.unitService.getUnits(query.trim(), '', undefined, 0, 50).subscribe();
+    }
+  }
 
   isCreateModalOpen = signal<boolean>(false);
   isVerifyModalOpen = signal<boolean>(false);
@@ -55,6 +90,11 @@ export class DocumentManagementController implements OnInit {
   errorMessage = signal<string>('');
   successMessage = signal<string>('');
 
+  canManageDocs(): boolean {
+    const roles = this.authService.currentUser()?.roles || [];
+    return roles.includes('SuperAdministrador') || roles.includes('AdministradorEmpresa') || roles.includes('GestorOperaciones');
+  }
+
   ngOnInit(): void {
     const unidadParam = this.route.snapshot.queryParamMap.get('unidad');
     if (unidadParam) {
@@ -66,14 +106,36 @@ export class DocumentManagementController implements OnInit {
 
   loadDocuments(): void {
     this.errorMessage.set('');
+    const skip = (this.currentPage() - 1) * this.pageSize();
     this.documentService
-      .getDocuments(this.selectedTipo(), this.selectedUnidad() ?? undefined)
+      .getDocuments(this.selectedTipo(), this.selectedUnidad() ?? undefined, skip, this.pageSize())
       .subscribe({
         error: (err) => this.errorMessage.set(err?.error?.detail || 'Error al cargar documentos.')
       });
   }
 
+  nextPage(): void {
+    if (this.currentPage() < this.totalPages()) {
+      this.currentPage.update(p => p + 1);
+      this.loadDocuments();
+    }
+  }
+
+  prevPage(): void {
+    if (this.currentPage() > 1) {
+      this.currentPage.update(p => p - 1);
+      this.loadDocuments();
+    }
+  }
+
+  onPageSizeChange(size: number): void {
+    this.pageSize.set(size);
+    this.currentPage.set(1);
+    this.loadDocuments();
+  }
+
   onFilter(): void {
+    this.currentPage.set(1);
     this.loadDocuments();
   }
 

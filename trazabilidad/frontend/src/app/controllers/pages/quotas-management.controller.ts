@@ -42,6 +42,15 @@ export class QuotasManagementController implements OnInit {
     return Object.entries(limites).map(([key, value]) => ({ key, value }));
   }
 
+  formatConcepto(key: string): string {
+    const map: Record<string, string> = {
+      reportesgenerados: 'Reportes Generados (Mes)',
+      unidadesregistradas: 'Unidades Físicas Registradas',
+      usuariosactivos: 'Usuarios Activos'
+    };
+    return map[key] || key;
+  }
+
   private fail(e: any): void {
     this.errorMessage.set(e?.status === 429 ? 'Límite de plan excedido (429)' : (e?.error?.detail ?? 'No se pudo cargar la cuota'));
   }

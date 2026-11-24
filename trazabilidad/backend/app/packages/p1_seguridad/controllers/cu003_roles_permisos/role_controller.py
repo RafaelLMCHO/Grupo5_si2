@@ -89,6 +89,12 @@ class RoleController:
                 detail="No tiene permisos para consultar roles de un usuario que no pertenece a su empresa activa."
             )
 
+        if not es_super and _es_superadmin(db, user):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Usuario con ID {idusuario} no encontrado."
+            )
+
         if not ut:
             ut = db.execute(stmt_ut).scalars().first()
         if not ut:
@@ -143,6 +149,12 @@ class RoleController:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tiene permisos para modificar roles de un usuario que no pertenece a su empresa activa."
+            )
+
+        if not es_super and _es_superadmin(db, user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Un Administrador de Empresa no tiene privilegios para modificar roles de un SuperAdministrador."
             )
 
         if not ut:

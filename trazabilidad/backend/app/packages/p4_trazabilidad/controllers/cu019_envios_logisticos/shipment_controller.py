@@ -27,8 +27,10 @@ router = APIRouter(prefix="/shipments", tags=["Gestión de Envíos Logísticos (
 
 # Roles autorizados a crear, editar y mover envíos.
 ROLES_GESTION_ENVIO = ("AdministradorEmpresa", "GestorOperaciones")
+ROLES_CONSULTA_ENVIO = ROLES_GESTION_ENVIO + ("Auditor",)
 
 requires_shipment_management = require_roles(*ROLES_GESTION_ENVIO)
+requires_shipment_read = require_roles(*ROLES_CONSULTA_ENVIO)
 
 # Transiciones válidas del ciclo de vida de un envío.
 # 'entregado' y 'cancelado' son estados finales.
@@ -329,7 +331,7 @@ def list_shipments_route(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(requires_shipment_management)
+    current_user: User = Depends(requires_shipment_read)
 ):
     """Listar envíos logísticos del tenant (CU-019)."""
     return ShipmentController.list_shipments(db, current_user, estado, skip, limit)
@@ -339,7 +341,7 @@ def list_shipments_route(
 def get_shipment_route(
     idenvio: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(requires_shipment_management)
+    current_user: User = Depends(requires_shipment_read)
 ):
     """Obtener el detalle de un envío con sus unidades asignadas (CU-019)."""
     return ShipmentController.get_shipment(db, current_user, idenvio)
