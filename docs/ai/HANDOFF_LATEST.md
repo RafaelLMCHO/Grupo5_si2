@@ -2,9 +2,37 @@
 
 > **Documento:** Pase de Posta Inmediato entre Sesiones de Agentes de IA  
 > **Ubicación:** `docs/ai/HANDOFF_LATEST.md`  
-> **Fecha / Sesión:** 2026-11-23  
+> **Fecha / Sesión:** 2026-11-24  
 > **Sprint Activo:** Sprint 5 (Seguridad, Hardening, Auditoría y Robusteza Multi-Tenant)  
-> **Estado Técnico:** **Despliegue Completo en la Nube: Backend en Railway `sprint#4` (`https://sprint4-production.up.railway.app`) | Frontend Web en Vercel (`https://frontend-sepia-seven-97.vercel.app`) | Base de Datos en Supabase Cloud con 38,386 filas | Mobile apuntado a Railway | Repositorio https://github.com/RafaelLMCHO/Grupo5_si2.git sincronizado**
+> **Estado Técnico:** **Despliegue Completo en la Nube: Backend en Railway `sprint#4` (`https://sprint4-production.up.railway.app`) | Frontend Web en Vercel (`https://frontend-sepia-seven-97.vercel.app` y `https://frontend-hbvjomrpq-sistemas26.vercel.app` públicos) | Base de Datos en Supabase Cloud (38,386 filas) | APK Release Generado (`app-release.apk`, 70.0MB) con soporte Consumidor y Voz | Repositorio https://github.com/RafaelLMCHO/Grupo5_si2.git sincronizado en rama `Rafael`**
+
+---
+
+## 0. Sesión actual (2026-11-24): Generación de APK Móvil, Desbloqueo Vercel y Soporte CU-028 Consumidor
+
+**Petición del Usuario:**
+1. Desbloquear enlaces individuales de Vercel para acceso público sin login de equipo (SSO).
+2. Solventar observaciones de credenciales demo para móvil (`admin@istore.com`, `superadmin@trazabilidad.com` y cuenta `Consumidor`).
+3. Reparar reporte de voz en móvil.
+4. Generar APK Release de Flutter para pruebas en físico.
+
+### 1. Acciones Realizadas y Verificaciones
+1. **Desbloqueo de Vercel SSO:**
+   * Se parcheó el proyecto en la API de Vercel con `ssoProtection: null`.
+   * Verificado con HTTP 200 directo tanto en la URL principal `https://frontend-sepia-seven-97.vercel.app` como en la URL individual de despliegue `https://frontend-hbvjomrpq-sistemas26.vercel.app`.
+2. **Creación y Validación de Usuario Consumidor (CU-028):**
+   * Se creó en Supabase Cloud el usuario `consumidor@istore.com` (idusuario `14711`, contraseña hasheada `Admin123!`).
+   * Se asoció a Tenant 1 (`iStore Bolivia S.A.`, idusuariotenant `16989`) con rol `Consumidor` (`idrol = 5`).
+   * Se vinculó al `actorcadena` ID `2207` actualizando su email a `consumidor@istore.com`.
+   * Verificado contra Railway: `GET /api/v1/consumer/history` retorna **144 compras históricas** con número de serie y UUIDs por un total de \$204,984.00 USD.
+3. **Ajustes en Flutter Móvil:**
+   * `api_config.dart`: Configurado `cloudRailway` (`https://sprint4-production.up.railway.app/api/v1`) como backend por defecto.
+   * `ai_assistant_controller.dart`: Detección dinámica de locales compatibles con español (`es_BO`, `es_419`, `es_US`) para el reconocedor de voz offline de Android en Bolivia y feedback de error visible en pantalla.
+   * `login_view.dart`: Configurados por defecto Tenant `1`, `admin@istore.com`, `Admin123!` y agregados 3 botones rápidos (ActionChips): `Admin iStore`, `SuperAdmin` y `Consumidor`.
+4. **Compilación de APK Release Exitosa:**
+   * Artefacto compilado: `mobile/build/app/outputs/flutter-apk/app-release.apk` (70.0MB).
+5. **Git Push:**
+   * Cambios commiteados y subidos a `https://github.com/RafaelLMCHO/Grupo5_si2.git` rama `Rafael`.
 
 ---
 
