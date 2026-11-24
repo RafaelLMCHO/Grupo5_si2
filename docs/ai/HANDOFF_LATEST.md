@@ -4,9 +4,17 @@
 > **Ubicación:** `docs/ai/HANDOFF_LATEST.md`  
 > **Fecha / Sesión:** 2026-11-23  
 > **Sprint Activo:** Sprint 5 (Seguridad, Hardening, Auditoría y Robusteza Multi-Tenant)  
-> **Estado Técnico:** **Subido a origin/Rafael (`https://github.com/ShecidV/Grupo-5-.git`) | Visualización de Gráficos Dinámicos en UI y PDF (CU-022) | Suite de pruebas: 252 tests verdes (0 fallos, 0 regresiones)** | Servidores Localhost Activos (FastAPI :8000, Angular :4200)
+> **Estado Técnico:** **Subido a origin/Rafael (`https://github.com/ShecidV/Grupo-5-.git`) | Auditoría Móvil Completa y Regla RecognitionService en AndroidManifest | Visualización de Gráficos Dinámicos en UI y PDF (CU-022) | Suite de pruebas: 252 tests verdes (0 fallos, 0 regresiones)** | Servidores Localhost Activos (FastAPI :8000, Angular :4200)
 
 ---
+
+## 0. Sesión actual (2026-11-23): Auditoría Integral de la App Móvil y Regla de Visibilidad en AndroidManifest
+
+**Petición:** Análisis de conectividad de la aplicación móvil Flutter y adición de la regla de visibilidad de paquete en AndroidManifest.xml.
+
+### 1. Hallazgos y Corrección
+* **Auditoría:** Se verificó la alineación al 100% de los 27 endpoints en `ApiConfig` contra los controladores de FastAPI, la navegación en `DashboardView`, y la visualización de gráficos nativos con `fl_chart`.
+* **Corrección Android 11+:** Se añadió el `<intent>` con `android.speech.RecognitionService` en el bloque `<queries>` de `trazabilidad/mobile/android/app/src/main/AndroidManifest.xml` para evitar que las políticas de *Package Visibility* bloqueen el reconocimiento de voz nativo en Android 11+.
 
 ## 0. Sesión actual (2026-11-23): Gráficos Dinámicos y Diagnóstico del Error 'network' en Reconocimiento de Voz
 
