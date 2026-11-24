@@ -4,9 +4,19 @@
 > **Ubicación:** `docs/ai/HANDOFF_LATEST.md`  
 > **Fecha / Sesión:** 2026-11-23  
 > **Sprint Activo:** Sprint 5 (Seguridad, Hardening, Auditoría y Robusteza Multi-Tenant)  
-> **Estado Técnico:** **Despliegue Exitoso en Railway en Proyecto Independiente `sprint#4` (`https://sprint4-production.up.railway.app`) | Conectado a Base de Datos Supabase Cloud con 38,386 filas | Frontend y Mobile actualizados a la nueva URL de producción | Servicios y remotos sincronizados**
+> **Estado Técnico:** **Despliegue Completo en la Nube: Backend en Railway `sprint#4` (`https://sprint4-production.up.railway.app`) | Frontend Web en Vercel (`https://frontend-sepia-seven-97.vercel.app`) | Base de Datos en Supabase Cloud con 38,386 filas | Mobile apuntado a Railway | Repositorio https://github.com/RafaelLMCHO/Grupo5_si2.git sincronizado**
 
 ---
+
+## 0. Sesión actual (2026-11-23): Despliegue de Frontend Web en Vercel
+
+**Petición del Usuario:** Subir el frontend web a Vercel.
+
+### 1. Despliegue en Producción
+* **Comando:** `vercel --prod --yes` ejecutado exitosamente.
+* **URL Canónica de Producción:** **`https://frontend-sepia-seven-97.vercel.app`**
+* **Deployment URL:** `https://frontend-hbvjomrpq-sistemas26.vercel.app`
+* **Verificación:** Código HTTP 200 y bundle compilado `main.js` verificado apuntando a `https://sprint4-production.up.railway.app/api/v1`.
 
 ## 0. Sesión actual (2026-11-23): Despliegue en Railway (Proyecto Independiente `sprint#4`) y Conexión Supabase Cloud
 
