@@ -4,9 +4,39 @@
 > **Ubicación:** `docs/ai/HANDOFF_LATEST.md`  
 > **Fecha / Sesión:** 2026-11-23  
 > **Sprint Activo:** Sprint 5 (Seguridad, Hardening, Auditoría y Robusteza Multi-Tenant)  
-> **Estado Técnico:** **Sincronizado y subido en origin/Rafael (`https://github.com/ShecidV/Grupo-5-.git`) y rafael-personal/Rafael (`https://github.com/RafaelLMCHO/Grupo5_si2.git`) | Auditoría Móvil Completa y Regla RecognitionService en AndroidManifest | Visualización de Gráficos Dinámicos en UI y PDF (CU-022) | Suite de pruebas: 252 tests verdes (0 fallos, 0 regresiones)** | Servidores Localhost Activos (FastAPI :8000, Angular :4200)
+> **Estado Técnico:** **Base de Datos Migrada y Poblada al 100% en Supabase Cloud (`vwonuktrcpnyoknrzrfs`) con 38,386 registros | Backend FastAPI conectado a la nube | Sincronizado en origin/Rafael y rafael-personal/Rafael** | Servidores Activos (FastAPI :8000, Angular :4200)
 
 ---
+
+## 0. Sesión actual (2026-11-23): Migración Integral de Base de Datos y Poblado en Supabase Cloud
+
+**Petición:** Subir la base de datos completa con todos sus datos poblados a Supabase Cloud.
+
+### 1. Proceso de Migración Ejecutado
+1. **Exportación limpia (`supabase_dump_completo.sql` - 7.4 MB):**
+   * Generado con `pg_dump` mediante flags `--no-owner --no-acl` para evitar colisiones de permisos en el entorno gestionado de Supabase.
+2. **Carga y Verificación en Supabase (`db.vwonuktrcpnyoknrzrfs.supabase.co`):**
+   * Conexión directa y ejecución con `psql` completando DDL, tipos enum, 53 tablas en `public`, índices, secuencias (`setval`) y claves foráneas.
+   * **Auditoría de datos en la nube (38,386 registros cargados exitosamente):**
+     * `tenant`: 9 empresas (SuperAdmin + 8 empresas comerciales).
+     * `usuario`: 35 usuarios.
+     * `producto`: 61 productos Apple.
+     * `varianteproducto`: 73 variantes.
+     * `catalogotenant`: 175 productos en catálogo.
+     * `unidadproducto`: 7,697 unidades con serial e IMEI.
+     * `codigoqr`: 5,996 códigos QR generados.
+     * `compra` / `compradetalle`: 310 órdenes y 966 líneas.
+     * `recepcioncompra`: 296 recepciones.
+     * `envio` / `condiciontransporte`: 306 despachos y 3,074 lecturas IoT.
+     * `venta` / `ventadetalle`: 3,051 ventas y 3,059 detalles.
+     * `pago` / `factura`: 3,061 pagos y 288 facturas.
+     * `bitacora`: 4,010 eventos de auditoría inmutable.
+     * `alerta`: 2,803 incidencias y alertas operativas.
+     * `registroblockchain`: 3,061 registros notarizados on-chain con hashes SHA-256.
+     * `suscripcion`: 10 planes activos.
+3. **Reconexión del Backend:**
+   * Actualizado `DATABASE_URL` y `SUPABASE_URL` en `trazabilidad/backend/.env`.
+   * Reiniciado FastAPI (`http://127.0.0.1:8000`), respondiendo `/health` con `db: connected` y probando exitosamente autenticación JWT y reportes IA de voz contra Supabase.
 
 ## 0. Sesión actual (2026-11-23): Auditoría Integral de la App Móvil y Regla de Visibilidad en AndroidManifest
 
