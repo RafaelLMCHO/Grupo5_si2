@@ -16,7 +16,7 @@ class LoginView extends StatefulWidget {
 class _LoginViewState extends State<LoginView> {
   final _formKey = GlobalKey<FormState>();
   final _tenantController = TextEditingController(text: '1');
-  final _emailController = TextEditingController(text: 'admin@trazabilidad.com');
+  final _emailController = TextEditingController(text: 'admin@istore.com');
   final _passwordController = TextEditingController(text: 'Admin123!');
   bool _obscurePassword = true;
   bool? _isServerOnline;
@@ -52,17 +52,17 @@ class _LoginViewState extends State<LoginView> {
     super.dispose();
   }
 
-  void _fillDemoCredentials() {
+  void _fillDemo(String tenant, String email, String label) {
     setState(() {
-      _tenantController.text = '1';
-      _emailController.text = 'admin@trazabilidad.com';
+      _tenantController.text = tenant;
+      _emailController.text = email;
       _passwordController.text = 'Admin123!';
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Credenciales de SuperAdmin cargadas (Admin123!)'),
-        duration: Duration(seconds: 2),
-        backgroundColor: Color(0xFF0284C7),
+      SnackBar(
+        content: Text('Credenciales cargadas: $label (Admin123!)'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: const Color(0xFF0284C7),
       ),
     );
   }
@@ -491,19 +491,45 @@ class _LoginViewState extends State<LoginView> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Botón de rellenar demo
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            onPressed: _fillDemoCredentials,
-                            icon: const Icon(Icons.vpn_key, size: 14, color: Color(0xFF38BDF8)),
-                            label: const Text(
-                              'Autocompletar SuperAdmin',
-                              style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12),
+                        // Botones de rellenar demo para presentación
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Cuentas Demo para Presentación:',
+                              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
                             ),
-                          ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                ActionChip(
+                                  avatar: const Icon(Icons.business, size: 14, color: Color(0xFF38BDF8)),
+                                  label: const Text('Admin iStore', style: TextStyle(fontSize: 11, color: Colors.white)),
+                                  backgroundColor: const Color(0xFF1E293B),
+                                  side: const BorderSide(color: Color(0xFF334155)),
+                                  onPressed: () => _fillDemo('1', 'admin@istore.com', 'Admin Empresa iStore'),
+                                ),
+                                ActionChip(
+                                  avatar: const Icon(Icons.shield, size: 14, color: Colors.amberAccent),
+                                  label: const Text('SuperAdmin', style: TextStyle(fontSize: 11, color: Colors.white)),
+                                  backgroundColor: const Color(0xFF1E293B),
+                                  side: const BorderSide(color: Color(0xFF334155)),
+                                  onPressed: () => _fillDemo('0', 'superadmin@trazabilidad.com', 'SuperAdministrador Global'),
+                                ),
+                                ActionChip(
+                                  avatar: const Icon(Icons.person, size: 14, color: Colors.greenAccent),
+                                  label: const Text('Consumidor', style: TextStyle(fontSize: 11, color: Colors.white)),
+                                  backgroundColor: const Color(0xFF1E293B),
+                                  side: const BorderSide(color: Color(0xFF334155)),
+                                  onPressed: () => _fillDemo('1', 'consumidor@istore.com', 'Consumidor iStore (CU-028)'),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
 
                         // Botón de inicio de sesión
                         ElevatedButton(

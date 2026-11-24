@@ -1,6 +1,5 @@
 import 'dart:async';
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 import 'secure_storage.dart';
 
@@ -21,16 +20,7 @@ class ApiConfig {
   static String _activeBaseUrl = _defaultBaseUrl;
   static bool _initialized = false;
 
-  static String get _defaultBaseUrl {
-    if (kIsWeb) return usbLocalhost;
-    try {
-      if (Platform.isAndroid) {
-        // En celular físico con USB (adb reverse tcp:8000 tcp:8000), 127.0.0.1 es el canal directo
-        return usbLocalhost;
-      }
-    } catch (_) {}
-    return usbLocalhost;
-  }
+  static String get _defaultBaseUrl => cloudRailway;
 
   static String get baseUrl => _activeBaseUrl;
 

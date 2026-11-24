@@ -68,6 +68,18 @@ class AiAssistantController extends ChangeNotifier {
         onError: (err) {
           debugPrint('[SpeechToText Error]: ${err.errorMsg}');
           _isListening = false;
+          final msg = err.errorMsg.toLowerCase();
+          if (msg.contains('error_no_match')) {
+            _errorMessage = 'No se detectó ninguna palabra. Habla más cerca del micrófono o escribe abajo.';
+          } else if (msg.contains('error_speech_timeout')) {
+            _errorMessage = 'Tiempo agotado. Vuelve a tocar el micrófono para hablar.';
+          } else if (msg.contains('error_network')) {
+            _errorMessage = 'El servicio de voz de Google requiere conexión a internet. También puedes escribir tu consulta.';
+          } else if (msg.contains('error_permission')) {
+            _errorMessage = 'Permiso de micrófono no otorgado. Concede el permiso en los Ajustes del teléfono.';
+          } else {
+            _errorMessage = 'Reconocimiento de voz: ${err.errorMsg}. Puedes escribir la consulta manualmente.';
+          }
           notifyListeners();
         },
         onStatus: (status) {
@@ -80,6 +92,8 @@ class AiAssistantController extends ChangeNotifier {
       return _isSpeechInitialized;
     } catch (e) {
       debugPrint('[SpeechToText Init Exception]: $e');
+      _errorMessage = 'Error al inicializar micrófono: $e';
+      notifyListeners();
       return false;
     }
   }
@@ -88,7 +102,7 @@ class AiAssistantController extends ChangeNotifier {
     _errorMessage = null;
     final available = await initSpeech();
     if (!available) {
-      _errorMessage = 'El micrófono o reconocimiento de voz no está disponible en este dispositivo.';
+      _errorMessage = 'El micrófono o reconocimiento de voz no está disponible. Verifica los permisos de la app en Ajustes.';
       notifyListeners();
       return;
     }
@@ -97,9 +111,25 @@ class AiAssistantController extends ChangeNotifier {
     _isListening = true;
     notifyListeners();
 
+    // Detección dinámica de idioma español disponible en el dispositivo
+    String? targetLocale;
+    try {
+      final locales = await _speechToText.locales();
+      final esLocale = locales.firstWhere(
+        (l) => l.localeId.toLowerCase().startsWith('es'),
+        orElse: () => locales.first,
+      );
+      targetLocale = esLocale.localeId;
+    } catch (_) {
+      targetLocale = null;
+    }
+
     await _speechToText.listen(
       listenOptions: SpeechListenOptions(
-        localeId: 'es_ES',
+        localeId: targetLocale,
+        listenMode: ListenMode.confirmation,
+        cancelOnError: true,
+        partialResults: true,
       ),
       onResult: (result) {
         _spokenText = result.recognizedWords;
@@ -117,6 +147,9 @@ class AiAssistantController extends ChangeNotifier {
 
     if (_spokenText.trim().isNotEmpty) {
       await submitQuery(_spokenText.trim());
+    } else {
+      _errorMessage = 'No se capturó ninguna frase. Mantén presionado o escribe tu consulta abajo.';
+      notifyListeners();
     }
   }
 
@@ -153,7 +186,7 @@ class AiAssistantController extends ChangeNotifier {
               'context': 'mobile_dashboard',
             }),
           )
-          .timeout(const Duration(seconds: 25));
+          .timeout(const Duration(seconds: 35));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -165,15 +198,23 @@ class AiAssistantController extends ChangeNotifier {
         if (_currentReport != null && _currentReport!.voiceSummary.isNotEmpty) {
           speakSummary();
         }
+      } else if (response.statusCode == 401) {
+        _errorMessage = 'Tu sesión ha expirado o no estás autenticado. Por favor, vuelve a iniciar sesión.';
+        _isLoading = false;
+        notifyListeners();
       } else {
-        final err = jsonDecode(utf8.decode(response.bodyBytes));
-        _errorMessage = err['detail'] ?? 'Error al procesar el reporte con IA.';
+        try {
+          final err = jsonDecode(utf8.decode(response.bodyBytes));
+          _errorMessage = err['detail'] ?? 'Error ${response.statusCode} al procesar el reporte con IA.';
+        } catch (_) {
+          _errorMessage = 'Error ${response.statusCode} al procesar el reporte con IA.';
+        }
         _isLoading = false;
         notifyListeners();
       }
     } catch (e) {
       _isLoading = false;
-      _errorMessage = 'No se pudo conectar con el servidor: $e';
+      _errorMessage = 'No se pudo conectar con el servidor ($e). Verifica tu conexión o el host en la pantalla de inicio.';
       notifyListeners();
     }
   }
