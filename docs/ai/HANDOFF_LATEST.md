@@ -4,7 +4,7 @@
 > **Ubicación:** `docs/ai/HANDOFF_LATEST.md`  
 > **Fecha / Sesión:** 2026-11-23  
 > **Sprint Activo:** Sprint 5 (Seguridad, Hardening, Auditoría y Robusteza Multi-Tenant)  
-> **Estado Técnico:** **Subido a origin/Rafael (`https://github.com/ShecidV/Grupo-5-.git`) | Auditoría Móvil Completa y Regla RecognitionService en AndroidManifest | Visualización de Gráficos Dinámicos en UI y PDF (CU-022) | Suite de pruebas: 252 tests verdes (0 fallos, 0 regresiones)** | Servidores Localhost Activos (FastAPI :8000, Angular :4200)
+> **Estado Técnico:** **Sincronizado y subido en origin/Rafael (`https://github.com/ShecidV/Grupo-5-.git`) y rafael-personal/Rafael (`https://github.com/RafaelLMCHO/Grupo5_si2.git`) | Auditoría Móvil Completa y Regla RecognitionService en AndroidManifest | Visualización de Gráficos Dinámicos en UI y PDF (CU-022) | Suite de pruebas: 252 tests verdes (0 fallos, 0 regresiones)** | Servidores Localhost Activos (FastAPI :8000, Angular :4200)
 
 ---
 
