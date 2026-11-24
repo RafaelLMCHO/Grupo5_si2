@@ -35,7 +35,7 @@
 | **CU-005** | Bitácora, notificaciones y push | P1 | `/bitacora`, `/notifications`, `/notifications/push` | Implementado / Probado |
 | **CU-006 a CU-012** | Catálogo, compras y recepciones | P2 | `/products`, `/purchases`, `/receptions` | Implementado / Probado |
 | **CU-013, CU-014** | Actores y ubicaciones | P3 | `/actors`, `/locations` | Implementado / Probado |
-| **CU-015 a CU-024** | Unidades, QR, envíos, eventos, IA, sospechas y alertas (CU-022: ranking ventas/períodos/top N + ficha detallada de producto a 36 meses) | P4 | `/units`, `/qr`, `/shipments`, `/alerts`, `/ai/voice-report`, `/ai/reports/{id}/export` | Implementado / Probado |
+| **CU-015 a CU-024** | Unidades, QR, envíos, eventos, IA, sospechas y alertas (CU-022: ranking ventas/períodos/top N, ficha detallada 36m y Comparativa Multi-Empresa para SuperAdmin en Web) | P4 | `/units`, `/qr`, `/shipments`, `/alerts`, `/ai/voice-report`, `/ai/reports/{id}/export` | Implementado / Probado |
 | **CU-025, CU-026** | Ventas y asignación de unidades | P5 | `/sales`, `/sales/{id}/units` | Implementado / Probado |
 | **CU-027** | Pagos de venta (Checkout Stripe, estado y reembolso) | P5 | `/payments`, `/payments/checkout`, `/payments/{id}/checkout`, `/payments/{id}/refund`, `/payments/webhook` | Implementado / Probado |
 | **CU-028** | Historial del consumidor | P5 | `/consumer/history` | Implementado / Probado (Web + Móvil) |

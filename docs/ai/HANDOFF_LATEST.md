@@ -3,12 +3,57 @@
 > **Documento:** Pase de Posta Inmediato entre Sesiones de Agentes de IA  
 > **Ubicación:** `docs/ai/HANDOFF_LATEST.md`  
 > **Fecha / Sesión:** 2026-11-24  
-> **Sprint Activo:** Hardening de Seguridad, Aislamiento Multi-Tenant y RBAC (Prioridad 0)  
-> **Estado Técnico:** **Despliegue Completo en Producción: Backend en Railway `sprint#4` (`https://sprint4-production.up.railway.app`) | Frontend Web en Vercel (`https://grupo5-trazabilidad.vercel.app` público) | Base de Datos en Supabase Cloud | 32/32 Tests Unitarios/Integración Verdes | Repositorio https://github.com/RafaelLMCHO/Grupo5_si2.git sincronizado en rama `Rafael`**
+> **Sprint Activo:** Hardening de Seguridad, Aislamiento Multi-Tenant y Reportes Dinámicos IA SuperAdmin (Web)  
+> **Estado Técnico:** **Backend en Railway `sprint#4` (`https://sprint4-production.up.railway.app`) | Frontend Web en Vercel (`https://grupo5-trazabilidad.vercel.app`) | Base de Datos en Supabase Cloud | 4/4 Tests Nuevos Verdes (`test_ai_cross_tenant.py`) + 251 Tests Verdes Globales | Repositorio https://github.com/RafaelLMCHO/Grupo5_si2.git en rama `Rafael`**
 
 ---
 
-## 0. Sesión actual (2026-11-24): Implementación Integral de Prioridad 0 (Seguridad, Aislamiento Multi-Tenant y RBAC)
+## 0. Sesión actual (2026-11-24): Reportes Dinámicos de IA para SuperAdmin (Comparativa Multi-Empresa) en Web
+
+**Petición del Usuario:**
+1. *"diseñame una implementacion en el superadmin en la parte de reportes dinamico ia , reportes de comparaciones entre todas las empresas, solo eso"*
+2. *"solo en la parte web implementalo, no lo hagas en el movil"*
+3. *"¿el dashboard se actualiza si vendo o aumento algo?"*
+
+### 1. Acciones Realizadas y Cambios en Backend y Frontend Web
+
+1. **Parser de Consultas en Lenguaje Natural (`backend/app/services/ai/voice_query_parser.py`):**
+   * Agregada la intención de primer nivel `comparacion_tenants` con frases clave ("comparar empresas", "comparacion entre empresas", "ranking de empresas", "benchmark multiempresa", "ventas por empresa", "stock por empresa").
+   * Integración de `Benchmark Comparativo Multi-Empresa (SuperAdmin)` en la interpretación canónica.
+
+2. **Motor de Agregación Cross-Tenant y Seguridad (`backend/app/services/ai/voice_query_engine.py`):**
+   * Implementada la función `query_cross_tenant_comparison_data(db, query, parsed)` que agrega datos reales de todos los `Tenant` activos:
+     * Ventas netas y monto facturado acumulado (`Venta.total`).
+     * Stock disponible (`UnidadProducto.estado == 'disponible'`).
+     * Unidades vendidas históricas o por período.
+     * Garantías activas (`GarantiaUnidad` unidas a `UnidadProducto`).
+     * Alertas e incidencias de telemetría registradas (`Alerta.idalerta`).
+   * Generación de KPIs consolidados (`Empresa Líder en Ventas`, `Facturación Red Consolidada`, `Stock Global Disponible`, `Garantías Tramitadas`), gráfico de barras horizontales (`chart_type: 'bar'`) y tabla multidimensional con ranking.
+   * Síntesis ejecutiva y mensaje de voz TTS con datos deterministas consolidados de la red.
+   * Protección estricta: `process_voice_query` valida `if not is_superadmin: raise HTTPException(status_code=403)` ante cualquier consulta cross-tenant.
+
+3. **Controlador y Exportación Segura (`backend/app/packages/p4_trazabilidad/controllers/cu022_ia/ai_report_controller.py`):**
+   * Detección de privilegios mediante `_es_superadmin(db, current_user)`.
+   * En `export_report_document`, verificación de que snapshots marcados con `is_cross_tenant: True` solo puedan ser descargados en PDF/Excel por un SuperAdministrador (403 Forbidden para usuarios estándar).
+
+4. **Frontend Web Angular (`frontend/src/app/controllers/pages/dashboard.controller.ts` y `dashboard.view.html`):**
+   * Detección reactiva de rol SuperAdministrador (`isSuperAdmin()`).
+   * Activación de 4 chips de acceso rápido específicos para SuperAdmin:
+     * `🏢 Comparativa de ventas e ingresos entre todas las empresas`
+     * `📊 Ranking de stock y rotación de inventario en la red`
+     * `🚨 Comparación de incidencias y garantías por empresa`
+     * `📈 Participación de mercado entre todas las empresas`
+   * Badge distintivo `🌐 SuperAdmin Multi-Tenant` en el modal del asistente y `🏢 Benchmark Multi-Empresa` en el encabezado del reporte generado.
+   * Cero modificaciones en la app móvil Flutter (alcance estrictamente WEB solicitado por el usuario).
+
+5. **Pruebas Automatizadas y Verificación:**
+   * Creada la suite `backend/tests/test_ai_cross_tenant.py` (4 tests pasando al 100% contra la base de datos Supabase):
+     * Parser reconoce intenciones comparativas.
+     * SuperAdmin genera reporte comparativo completo con KPIs, ranking y gráfico de barras.
+     * Usuario sin rol SuperAdministrador recibe 403 Forbidden.
+     * Descarga de documento comparativo PDF/Excel bloqueada (403) para no-SuperAdmin.
+   * `npm run build` en Angular completado con 0 errores.
+   * Backend desplegado en Railway `sprint#4`.
 
 **Petición del Usuario:**
 "ahora implementa la prioridad 0" (siguiendo las directrices canónicas de `prompts_correcciones_grupo5.txt`):

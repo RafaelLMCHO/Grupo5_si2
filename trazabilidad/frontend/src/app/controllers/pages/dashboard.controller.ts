@@ -38,6 +38,25 @@ export class DashboardController implements OnInit {
     '🛡️ Resumen de bitácora y auditoría'
   ];
 
+  isSuperAdmin(): boolean {
+    const user = this.currentUser();
+    if (!user) return false;
+    return (user.roles || []).some(r => r.toLowerCase() === 'superadministrador');
+  }
+
+  get activePrompts(): string[] {
+    if (this.isSuperAdmin()) {
+      return [
+        '🏢 Comparativa de ventas e ingresos entre todas las empresas',
+        '📊 Ranking de stock y rotación de inventario en la red',
+        '🚨 Comparación de incidencias y garantías por empresa',
+        '📈 Participación de mercado entre todas las empresas',
+        ...this.quickPrompts
+      ];
+    }
+    return this.quickPrompts;
+  }
+
   ngOnInit(): void {
     this.tenantService.getTenants().subscribe();
   }

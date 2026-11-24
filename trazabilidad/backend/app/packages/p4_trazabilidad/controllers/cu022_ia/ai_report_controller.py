@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.controllers.shared import resolve_tenant_id
+from app.controllers.shared import resolve_tenant_id, _es_superadmin
 from app.controllers.cu004_autenticacion.auth_controller import get_current_user
 from app.models.cu002_usuarios.user import User
 from app.views.cu022_ia.ai_schemas import VoiceQueryRequest, VoiceReportResponse
@@ -28,6 +28,7 @@ def generate_voice_report(
     """
     # ADR-001/005: empresa activa del JWT, vínculos del usuario y bypass SuperAdmin.
     tenant_id = resolve_tenant_id(db=db, user=current_user)
+    is_super = _es_superadmin(db, current_user)
 
     report_dict = process_voice_query(
         db=db,
@@ -35,6 +36,7 @@ def generate_voice_report(
         query=payload.query,
         context=payload.context,
         user_email=current_user.email,
+        is_superadmin=is_super,
     )
 
     return VoiceReportResponse(**report_dict)
@@ -57,7 +59,17 @@ def export_report_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="El reporte solicitado no existe o ha expirado. Por favor genera una nueva consulta.",
         )
-    if cached.get("tenant_id") != resolve_tenant_id(db=db, user=current_user):
+
+    is_super = _es_superadmin(db, current_user)
+    is_cross = cached.get("is_cross_tenant", False)
+
+    if is_cross:
+        if not is_super:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acceso denegado: El reporte comparativo global solo puede ser descargado por el SuperAdministrador.",
+            )
+    elif not is_super and cached.get("tenant_id") != resolve_tenant_id(db=db, user=current_user):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="El reporte solicitado no existe o ha expirado. Por favor genera una nueva consulta.",

@@ -22,6 +22,20 @@ _NUMEROS = {
 
 _INTENTES = [
     (
+        "comparacion_tenants",
+        (
+            "comparar empresas", "comparacion entre empresas", "comparativa de todas las empresas",
+            "comparativa de empresas", "ranking de empresas", "todas las empresas",
+            "benchmark de empresas", "ventas por empresa", "stock por empresa",
+            "empresas con mas ventas", "entre empresas", "comparar todas",
+            "comparacion de empresas", "comparativa general", "comparativa de ventas entre todas las empresas",
+            "ranking de stock y rotacion de inventario en la red", "comparacion de incidencias y garantias por empresa",
+            "participacion de mercado de las empresas", "distribucion de stock en la red",
+            "comparar los tenants", "ranking de tenants", "todas las importadoras", "red de empresas",
+            "desempeno de empresas", "desempeno por empresa", "resumen de empresas",
+        ),
+    ),
+    (
         "inventario",
         (
             "stock", "inventario", "almacen", "existencia", "existencias",
@@ -278,9 +292,11 @@ class ParsedQuery:
 
     def interpretation(self) -> str:
         partes: List[str] = []
-        if self.wants_detail:
+        if self.intent == "comparacion_tenants":
+            partes.append("Benchmark Comparativo Multi-Empresa (SuperAdmin)")
+        elif self.wants_detail:
             partes.append("Análisis detallado de producto (36 meses)")
-        if self.intent == "rentabilidad":
+        elif self.intent == "rentabilidad":
             partes.append(f"Top {self.limit} por margen de rentabilidad" if self.limit else "Análisis de rentabilidad y margen comercial")
         elif self.intent == "garantias":
             partes.append("Control de calidad, garantías y devoluciones")

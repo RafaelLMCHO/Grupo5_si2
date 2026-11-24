@@ -4,6 +4,7 @@ import re
 from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, Any, List, Optional, Tuple
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import case, select, func, and_, desc, distinct, text
 
@@ -1322,6 +1323,184 @@ def build_product_detail(
     }
 
 
+def query_cross_tenant_comparison_data(
+    db: Session, query: str, parsed: ParsedQuery
+) -> Dict[str, Any]:
+    """Agrega métricas comparativas consolidadas de todas las empresas activas (SuperAdmin)."""
+    # 1. Obtener todas las empresas activas
+    tenants = db.execute(
+        select(Tenant).where(Tenant.activo == True).order_by(Tenant.idtenant.asc())
+    ).scalars().all()
+
+    # 2. Agregaciones de ventas
+    filtros_v = [Venta.estado != "cancelada"]
+    if parsed.desde and parsed.hasta:
+        filtros_v.extend([Venta.fechaventa >= parsed.desde, Venta.fechaventa < parsed.hasta])
+    v_stmt = (
+        select(
+            Venta.idtenant,
+            func.count(Venta.idventa).label("num_ventas"),
+            func.coalesce(func.sum(Venta.total), 0.0).label("monto_ventas"),
+        )
+        .where(*filtros_v)
+        .group_by(Venta.idtenant)
+    )
+    ventas_map = {r.idtenant: (r.num_ventas, float(r.monto_ventas)) for r in db.execute(v_stmt).all()}
+
+    # 3. Agregaciones de stock disponible
+    stk_stmt = (
+        select(
+            UnidadProducto.idtenant,
+            func.count(UnidadProducto.idunidad).label("stock_disponible"),
+        )
+        .where(UnidadProducto.estado == "disponible")
+        .group_by(UnidadProducto.idtenant)
+    )
+    stock_map = {r.idtenant: r.stock_disponible for r in db.execute(stk_stmt).all()}
+
+    # 4. Agregaciones de unidades vendidas
+    filtros_u = [UnidadProducto.estado == "vendido"]
+    if parsed.desde and parsed.hasta:
+        filtros_u.extend([UnidadProducto.fecharecepcion >= parsed.desde, UnidadProducto.fecharecepcion < parsed.hasta])
+    vend_stmt = (
+        select(
+            UnidadProducto.idtenant,
+            func.count(UnidadProducto.idunidad).label("unidades_vendidas"),
+        )
+        .where(*filtros_u)
+        .group_by(UnidadProducto.idtenant)
+    )
+    vendidas_map = {r.idtenant: r.unidades_vendidas for r in db.execute(vend_stmt).all()}
+
+    # 5. Agregaciones de garantías vinculadas a unidades de cada tenant
+    gar_stmt = (
+        select(
+            UnidadProducto.idtenant,
+            func.count(GarantiaUnidad.idgarantia).label("garantias_count"),
+        )
+        .join(UnidadProducto, GarantiaUnidad.idunidad == UnidadProducto.idunidad)
+    )
+    if parsed.desde and parsed.hasta:
+        gar_stmt = gar_stmt.where(
+            GarantiaUnidad.fechainicio >= parsed.desde.date(),
+            GarantiaUnidad.fechainicio < parsed.hasta.date(),
+        )
+    gar_stmt = gar_stmt.group_by(UnidadProducto.idtenant)
+    garantias_map = {r.idtenant: r.garantias_count for r in db.execute(gar_stmt).all()}
+
+    # 6. Agregaciones de alertas
+    filtros_a = []
+    if parsed.desde and parsed.hasta:
+        filtros_a.extend([Alerta.fechadeteccion >= parsed.desde, Alerta.fechadeteccion < parsed.hasta])
+    alt_stmt = select(
+        Alerta.idtenant,
+        func.count(Alerta.idalerta).label("alertas_count"),
+    )
+    if filtros_a:
+        alt_stmt = alt_stmt.where(*filtros_a)
+    alt_stmt = alt_stmt.group_by(Alerta.idtenant)
+    alertas_map = {r.idtenant: r.alertas_count for r in db.execute(alt_stmt).all()}
+
+    # 7. Consolidar lista de empresas
+    items = []
+    for t in tenants:
+        n_ventas, m_ventas = ventas_map.get(t.idtenant, (0, 0.0))
+        stk = stock_map.get(t.idtenant, 0)
+        vend = vendidas_map.get(t.idtenant, 0)
+        gar = garantias_map.get(t.idtenant, 0)
+        alt = alertas_map.get(t.idtenant, 0)
+        items.append({
+            "idtenant": t.idtenant,
+            "nombre": t.nombre,
+            "nit": t.nit or "N/A",
+            "ventas_monto": m_ventas,
+            "ventas_count": n_ventas,
+            "unidades_vendidas": vend,
+            "stock_disponible": stk,
+            "garantias_count": gar,
+            "alertas_count": alt,
+        })
+
+    # Determinar foco de la consulta
+    q_norm = normalize_text(query)
+    is_stock_focus = any(k in q_norm for k in ("stock", "inventario", "almacen")) and not any(k in q_norm for k in ("venta", "factur", "ingreso"))
+    is_garantia_focus = any(k in q_norm for k in ("garantia", "devolucion", "incidencia", "falla", "alerta"))
+
+    if is_stock_focus:
+        items.sort(key=lambda x: x["stock_disponible"], reverse=True)
+        chart_title = "Distribución de Stock Disponible por Empresa (Unidades)"
+        chart_data = [x["stock_disponible"] for x in items]
+        chart_label = "Unidades Disponibles"
+    elif is_garantia_focus:
+        items.sort(key=lambda x: (x["garantias_count"] + x["alertas_count"]), reverse=True)
+        chart_title = "Incidencias y Garantías por Empresa (Casos)"
+        chart_data = [x["garantias_count"] for x in items]
+        chart_label = "Garantías Tramitadas"
+    else:
+        items.sort(key=lambda x: x["ventas_monto"], reverse=True)
+        chart_title = "Comparativa de Ingresos por Empresa ($ USD)"
+        chart_data = [round(x["ventas_monto"], 2) for x in items]
+        chart_label = "Ingresos ($ USD)"
+
+    total_ingresos = sum(x["ventas_monto"] for x in items)
+    total_stock = sum(x["stock_disponible"] for x in items)
+    total_ventas = sum(x["ventas_count"] for x in items)
+    total_garantias = sum(x["garantias_count"] for x in items)
+    lider = items[0] if items else {"nombre": "N/A", "ventas_monto": 0.0}
+
+    palette = ["#38BDF8", "#10B981", "#F59E0B", "#818CF8", "#EF4444", "#06B6D4", "#EC4899", "#8B5CF6", "#14B8A6"]
+    bg_colors = [palette[i % len(palette)] for i in range(len(items))]
+
+    kpis = [
+        {"label": "Empresa Líder en Ventas", "value": f"{lider['nombre']}", "trend": f"${lider['ventas_monto']:,.2f} USD", "color": "#10B981"},
+        {"label": "Facturación Red Consolidada", "value": f"${total_ingresos:,.2f} USD", "trend": f"{total_ventas} ventas", "color": "#38BDF8"},
+        {"label": "Stock Global Disponible", "value": f"{total_stock:,} und", "trend": f"{len(items)} empresas activas", "color": "#F59E0B"},
+        {"label": "Garantías Tramitadas", "value": f"{total_garantias} casos", "trend": "Red de importadoras", "color": "#818CF8"},
+    ]
+
+    chart = {
+        "chart_type": "bar",
+        "title": chart_title,
+        "labels": [x["nombre"] for x in items],
+        "datasets": [
+            {
+                "label": chart_label,
+                "data": chart_data,
+                "backgroundColor": bg_colors,
+            }
+        ],
+    }
+
+    table_headers = ["Empresa", "NIT", "Facturación ($)", "Transacciones", "Stock Disponible", "Garantías", "Alertas"]
+    table_rows = [
+        [
+            x["nombre"],
+            x["nit"],
+            f"${x['ventas_monto']:,.2f}",
+            x["ventas_count"],
+            f"{x['stock_disponible']} und",
+            f"{x['garantias_count']} casos",
+            f"{x['alertas_count']} alertas",
+        ]
+        for x in items
+    ]
+
+    return {
+        "category": "comparacion_tenants",
+        "title": f"Benchmark Comparativo Multi-Empresa ({parsed.period_label})",
+        "kpis": kpis,
+        "chart": chart,
+        "table_headers": table_headers,
+        "table_rows": table_rows,
+        "raw_count": len(items),
+        "lider_nombre": lider["nombre"],
+        "lider_monto": lider["ventas_monto"],
+        "total_plataforma_ingresos": total_ingresos,
+        "total_empresas": len(items),
+        "stock_total": total_stock,
+    }
+
+
 def synthesize_with_gemini(
     query: str,
     category: str,
@@ -1499,6 +1678,26 @@ Tu tarea es responder con dos secciones separadas por el delimitador exacto '---
             f"- **Incidentes de Seguridad:** Se detectaron **{incid} alertas/denuncias** que requieren verificación del número de serie o empaque.\n"
             f"- **Garantía Anti-Falsificación:** Las unidades certificadas permiten al consumidor final verificar su legitimidad escaneando el código QR oficial."
         )
+    elif category == "comparacion_tenants":
+        lider_nombre = data.get("lider_nombre", "N/A")
+        lider_monto = data.get("lider_monto", 0.0)
+        tot_plataforma = data.get("total_plataforma_ingresos", 0.0)
+        tot_empresas = data.get("total_empresas", 0)
+        stock_total = data.get("stock_total", 0)
+        voice = (
+            f"En la comparativa de las {tot_empresas} empresas de la red, {lider_nombre} lidera la facturacion "
+            f"con ${lider_monto:,.2f} dolares de un total consolidado de ${tot_plataforma:,.2f} dolares, "
+            f"con {stock_total} unidades disponibles en inventario global."
+        )
+        exec_md = (
+            f"### Benchmark Comparativo Multi-Empresa · Vista SuperAdministrador\n"
+            f"- **Criterio de Análisis:** {interpretation}.\n"
+            f"- **Empresa Líder en Ventas:** **{lider_nombre}** con **${lider_monto:,.2f} USD** facturados.\n"
+            f"- **Facturación Consolidada de la Red:** **${tot_plataforma:,.2f} USD** generados a través de las {tot_empresas} empresas registradas.\n"
+            f"- **Inventario Global de Dispositivos:** **{stock_total} unidades disponibles** para despacho inmediato en toda la plataforma.\n"
+            f"- **Gobernanza y Supervisión:** Se visualizan los indicadores cruzados de facturación, volumen de stock, garantías y alertas operativas de cada importadora registrada.\n"
+            f"- **Recomendación Estratégica para SuperAdmin:** Equilibrar la cuota de inventario en empresas con alta demanda comercial y auditar las empresas con mayor porcentaje de alertas de transporte o devoluciones."
+        )
     else:
         voice = f"He procesado tu consulta de {tenant_name} y consolidado los datos del sistema en el reporte dinámico."
         exec_md = f"### Informe Consolidado ({tenant_name})\nConsulta ejecutada con éxito sobre los registros activos del tenant."
@@ -1512,38 +1711,49 @@ def process_voice_query(
     query: str,
     context: Optional[str] = None,
     user_email: str = "Admin",
+    is_superadmin: bool = False,
 ) -> Dict[str, Any]:
     """
     Punto de entrada principal:
     1. Obtiene datos del tenant y parsea la consulta (intención, período, top N, filtros).
-    2. Consulta PostgreSQL con aislamiento garantizado (idtenant).
+    2. Consulta PostgreSQL con aislamiento garantizado (idtenant o cross-tenant para SuperAdmin).
     3. Sintetiza análisis mediante Gemini o Motor Semántico.
     4. Guarda en caché para exportación instantánea a PDF/Excel.
     """
-    tenant = db.execute(select(Tenant).where(Tenant.idtenant == tenant_id)).scalars().first()
-    tenant_name = tenant.nombre if tenant else "Empresa Registrada"
-    tenant_nit = tenant.nit if tenant else "NIT General"
-
     parsed = parse_query(query, now=get_bolivia_now())
     parsed = _resolver_filtros_catalogo(db, tenant_id, parsed, query)
     intent = parsed.intent
 
-    if intent == "ventas":
-        data = query_sales_ranking_data(db, tenant_id, query, parsed)
-    elif intent == "rentabilidad":
-        data = query_profitability_data(db, tenant_id, query, parsed)
-    elif intent == "garantias":
-        data = query_warranty_quality_data(db, tenant_id, query, parsed)
-    elif intent == "blockchain":
-        data = query_blockchain_security_data(db, tenant_id, query, parsed)
-    elif intent == "compras":
-        data = query_purchases_data(db, tenant_id, query, parsed)
-    elif intent == "logistica":
-        data = query_logistics_data(db, tenant_id, query, parsed)
-    elif intent == "auditoria":
-        data = query_audit_data(db, tenant_id, query, parsed)
+    if intent == "comparacion_tenants":
+        if not is_superadmin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acceso denegado: Los reportes comparativos entre todas las empresas están reservados exclusivamente para el SuperAdministrador."
+            )
+        data = query_cross_tenant_comparison_data(db, query, parsed)
+        tenant_name = "Plataforma Global (SuperAdmin)"
+        tenant_nit = "RED MULTI-TENANT"
     else:
-        data = query_inventory_data(db, tenant_id, query, parsed)
+        tenant = db.execute(select(Tenant).where(Tenant.idtenant == tenant_id)).scalars().first()
+        tenant_name = tenant.nombre if tenant else "Empresa Registrada"
+        tenant_nit = tenant.nit if tenant else "NIT General"
+
+        if intent == "ventas":
+            data = query_sales_ranking_data(db, tenant_id, query, parsed)
+        elif intent == "rentabilidad":
+            data = query_profitability_data(db, tenant_id, query, parsed)
+        elif intent == "garantias":
+            data = query_warranty_quality_data(db, tenant_id, query, parsed)
+        elif intent == "blockchain":
+            data = query_blockchain_security_data(db, tenant_id, query, parsed)
+        elif intent == "compras":
+            data = query_purchases_data(db, tenant_id, query, parsed)
+        elif intent == "logistica":
+            data = query_logistics_data(db, tenant_id, query, parsed)
+        elif intent == "auditoria":
+            data = query_audit_data(db, tenant_id, query, parsed)
+        else:
+            data = query_inventory_data(db, tenant_id, query, parsed)
 
     product_detail: Dict[str, Any] = {}
     if parsed.wants_detail and parsed.producto:
@@ -1558,7 +1768,14 @@ def process_voice_query(
         filters_applied["detalle_desde"] = product_detail["desde"]
         filters_applied["detalle_hasta"] = product_detail["hasta"]
 
-    if intent == "ventas":
+    if intent == "comparacion_tenants":
+        followups = [
+            "🏢 Comparativa de ventas e ingresos entre todas las empresas",
+            "📊 Ranking de stock y rotación de inventario en la red",
+            "🚨 Comparación de incidencias y garantías por empresa",
+            "📈 Participación de mercado entre todas las empresas",
+        ]
+    elif intent == "ventas":
         followups = [
             "🏆 Top 5 productos por ingresos en los últimos 6 meses",
             "💰 Top 5 productos con mayor margen de ganancia",
@@ -1610,6 +1827,7 @@ def process_voice_query(
         "report_id": report_id,
         "title": data.get("title", "Reporte Dinámico"),
         "tenant_id": tenant_id,
+        "is_cross_tenant": (intent == "comparacion_tenants"),
         "tenant_name": tenant_name,
         "tenant_nit": tenant_nit,
         "voice_summary": voice_sum,
