@@ -4,7 +4,35 @@
 > **Ubicación:** `docs/ai/HANDOFF_LATEST.md`  
 > **Fecha / Sesión:** 2026-11-23  
 > **Sprint Activo:** Sprint 5 (Seguridad, Hardening, Auditoría y Robusteza Multi-Tenant)  
-> **Estado Técnico:** **Base de Datos Migrada y Poblada al 100% en Supabase Cloud (`vwonuktrcpnyoknrzrfs`) con 38,386 registros | Backend FastAPI conectado a la nube | Sincronizado en origin/Rafael y rafael-personal/Rafael** | Servidores Activos (FastAPI :8000, Angular :4200)
+> **Estado Técnico:** **Despliegue Exitoso en Railway en Proyecto Independiente `sprint#4` (`https://sprint4-production.up.railway.app`) | Conectado a Base de Datos Supabase Cloud con 38,386 filas | Frontend y Mobile actualizados a la nueva URL de producción | Servicios y remotos sincronizados**
+
+---
+
+## 0. Sesión actual (2026-11-23): Despliegue en Railway (Proyecto Independiente `sprint#4`) y Conexión Supabase Cloud
+
+**Petición del Usuario:** Subir todo a Railway en un proyecto nuevo llamado `sprint#4` (Opción A: preservando intacto el proyecto `si2_parcial2`).
+
+### 1. Infraestructura Desplegada en Railway
+1. **Nuevo Proyecto Aislado:**
+   * **Nombre:** `sprint#4` (ID: `4889a3c5-4ac9-49f3-bd7e-f75ce14bf66c`).
+   * **Entorno:** `production` (ID: `4c059e0c-bbf5-4125-a4e4-b86a74ef0aa9`).
+   * **Servicio:** `sprint#4` (ID: `0e7c902a-f148-4bf5-8172-786260fdedad`).
+   * **Dominio Público Oficial:** `https://sprint4-production.up.railway.app`
+2. **Configuración de Variables de Entorno en Railway:**
+   * `DATABASE_URL`: `postgresql+psycopg://postgres.vwonuktrcpnyoknrzrfs:Rafael2026Trazabilidad!@aws-0-us-west-2.pooler.supabase.com:5432/postgres` (Utilizando el Supabase Session Pooler compatible con IPv4/IPv6 en AWS us-west-2).
+   * `SUPABASE_URL`: `https://vwonuktrcpnyoknrzrfs.supabase.co`
+   * `BLOCKCHAIN_ENABLED`: `false`
+   * `PORT`: `8000`
+   * `CORS_ORIGINS`: `*`
+   * `JWT_SECRET`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `REFRESH_TOKEN_EXPIRE_DAYS`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
+3. **Validaciones en Producción (100% Exitosas):**
+   * **Healthcheck:** `GET https://sprint4-production.up.railway.app/health` -> `{"status":"ok","app":"Sistema de Trazabilidad","db":"connected"}`.
+   * **Autenticación Multi-Tenant:** `POST /api/v1/auth/login` con credenciales reales (`admin@istore.com`, `demo`) generando JWT bearer token.
+   * **Consultas de Datos:** `GET /api/v1/units` retornando unidades reales desde Supabase.
+   * **Inteligencia Artificial por Voz:** `POST /api/v1/ai/voice-report` generando reportes ejecutivos dinámicos, KPIs, gráficos y enlaces de descarga oficial.
+4. **Clientes Actualizados con la Nueva URL:**
+   * `trazabilidad/frontend/src/environments/environment.prod.ts` -> `https://sprint4-production.up.railway.app/api/v1`
+   * `trazabilidad/mobile/lib/core/api_config.dart` -> `https://sprint4-production.up.railway.app/api/v1`
 
 ---
 

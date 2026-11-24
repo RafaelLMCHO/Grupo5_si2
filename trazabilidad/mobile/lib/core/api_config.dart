@@ -6,7 +6,7 @@ import 'secure_storage.dart';
 
 class ApiConfig {
   /// Presets recomendados según el tipo de conexión:
-  static const String cloudRailway = 'https://grupo5si2-production-380b.up.railway.app/api/v1';
+  static const String cloudRailway = 'https://sprint4-production.up.railway.app/api/v1';
   static const String usbLocalhost = 'http://127.0.0.1:8000/api/v1';
   static const String wifiLanHost = 'http://192.168.1.2:8000/api/v1';
   static const String emulatorHost = 'http://10.0.2.2:8000/api/v1';

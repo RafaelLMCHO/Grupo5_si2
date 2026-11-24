@@ -2,7 +2,7 @@
 
 > **Documento:** Snapshot Técnico y Contexto Operativo para Agentes de IA  
 > **Ubicación:** `docs/ai/CURRENT_STATE.md`  
-> **Última Actualización:** 2026-11-23 (Resolución Integral del Asistente por Voz CU-022: Integración de gráficos vectoriales interactivos SVG en frontend y ReportLab en exportación PDF; corrección de firma en generador Excel con 252 tests verdes al 100%; diagnóstico y guía para error 'network' de Web Speech API)  
+> **Última Actualización:** 2026-11-23 (Despliegue de Producción en Railway bajo el proyecto independiente `sprint#4` [`https://sprint4-production.up.railway.app`]; Conexión completa a la base de datos de producción en Supabase Cloud con 38,386 filas; Verificación operativa de login, unidades y asistente IA; Clientes Frontend y Mobile apuntados a producción)  
 > **Branch Principal:** `main` (o rama de desarrollo activa)
 
 ---
